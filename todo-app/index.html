@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReBorn — 할 일 관리</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header__top header__top--sticky">
+        <h1 class="header__title">
+          <span class="header__logo header__logo--egg" aria-hidden="true">
+            <svg class="header__egg-svg" viewBox="0 0 44 56" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+              <path class="header__egg-body" d="M22 4C12 4 4 16 4 32c0 12 8 20 18 20s18-8 18-20c0-16-8-28-18-28z" fill="currentColor"/>
+              <!-- 가로로 깨진 금 (중앙을 가로지르는 지그재그) -->
+              <path class="header__egg-crack" d="M8 27l6-2 4 3-2 3 6-1 4 2 5-2 4 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.65"/>
+            </svg>
+          </span>
+          ReBorn
+        </h1>
+        <button type="button" class="theme-toggle" id="themeToggle" aria-label="테마 변경 (라이트/다크)" title="테마 변경">
+          <span class="theme-toggle__icon theme-toggle__icon--sun" aria-hidden="true"><i data-lucide="sun"></i></span>
+          <span class="theme-toggle__icon theme-toggle__icon--moon" aria-hidden="true"><i data-lucide="moon"></i></span>
+        </button>
+      </div>
+      <div class="header__desc-row">
+        <p class="header__quote" id="headerQuote" aria-live="polite"></p>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="input-section" aria-label="새 할 일 추가">
+        <form class="input-form" id="todoForm" novalidate>
+          <label for="todoInput" class="visually-hidden">할 일 내용</label>
+          <input
+            type="text"
+            id="todoInput"
+            class="input-form__field"
+            placeholder="할 일을 입력하세요"
+            autocomplete="off"
+            maxlength="200"
+            aria-describedby="input-hint"
+          >
+          <span id="input-hint" class="visually-hidden">Enter 또는 추가 버튼으로 등록</span>
+          <button type="button" class="input-form__btn input-form__btn--calendar" id="datePickerBtn" aria-label="날짜 및 반복 요일 선택" title="날짜·반복 선택">
+            <span class="input-form__calendar-icon" aria-hidden="true"><i data-lucide="calendar-days"></i></span>
+          </button>
+          <button type="submit" class="input-form__btn" aria-label="할 일 추가">추가</button>
+        </form>
+      </section>
+
+      <!-- 날짜·반복 요일 선택 모달 -->
+      <div class="modal-overlay" id="datePickerModal" role="dialog" aria-modal="true" aria-labelledby="datePickerTitle" hidden>
+        <div class="modal modal--date-picker">
+          <p class="modal__title" id="datePickerTitle">날짜 및 반복 요일</p>
+          <div class="date-picker__body">
+            <div class="date-picker__row">
+              <label for="datePickerInput" class="date-picker__label">시작 날짜</label>
+              <input type="date" id="datePickerInput" class="date-picker__input" aria-label="시작 날짜">
+            </div>
+            <div class="date-picker__row">
+              <label for="datePickerEndInput" class="date-picker__label">종료 날짜</label>
+              <input type="date" id="datePickerEndInput" class="date-picker__input" aria-label="종료 날짜">
+            </div>
+            <div class="date-picker__row">
+              <span class="date-picker__label">반복 요일</span>
+              <div class="date-picker__weekdays" role="group" aria-label="반복할 요일 선택">
+                <button type="button" class="date-picker__weekday" data-day="0" aria-pressed="false">일</button>
+                <button type="button" class="date-picker__weekday" data-day="1" aria-pressed="false">월</button>
+                <button type="button" class="date-picker__weekday" data-day="2" aria-pressed="false">화</button>
+                <button type="button" class="date-picker__weekday" data-day="3" aria-pressed="false">수</button>
+                <button type="button" class="date-picker__weekday" data-day="4" aria-pressed="false">목</button>
+                <button type="button" class="date-picker__weekday" data-day="5" aria-pressed="false">금</button>
+                <button type="button" class="date-picker__weekday" data-day="6" aria-pressed="false">토</button>
+              </div>
+            </div>
+          </div>
+          <div class="modal__actions">
+            <button type="button" class="modal__btn modal__btn--cancel" id="datePickerCancel">취소</button>
+            <button type="button" class="modal__btn modal__btn--confirm" id="datePickerOk">확인</button>
+          </div>
+        </div>
+      </div>
+
+      <section class="list-section" id="listSection" aria-label="할 일 목록">
+        <div class="list-options">
+          <div class="tag-filter" id="tagFilter" aria-label="태그별 필터">
+            <span class="tag-filter__label">태그:</span>
+            <div class="tag-filter__list" id="tagFilterList"></div>
+          </div>
+          <div class="sort-wrap">
+            <label for="sortSelect" class="visually-hidden">정렬 기준</label>
+            <select id="sortSelect" class="sort-select" aria-label="정렬 기준 선택">
+              <option value="basic" selected>기본순</option>
+              <option value="newest">최신순</option>
+              <option value="oldest">오래된순</option>
+            </select>
+            <button type="button" class="sort-priority-btn" id="prioritizeIncompleteBtn" aria-pressed="false">미완료 우선: OFF</button>
+          </div>
+        </div>
+
+        <ul class="todo-list" id="todoList" aria-live="polite">
+          <!-- JS로 할 일 아이템 렌더 -->
+        </ul>
+
+        <p class="list-empty" id="listEmpty" hidden>
+          할 일이 없습니다. 위에서 새로 추가해 보세요.
+        </p>
+      </section>
+
+      <!-- My 탭: 캘린더 + 휴지통 -->
+      <section class="my-view" id="myView" hidden aria-label="ReBorn">
+        <div class="my-view__calendar">
+          <h2 class="my-view__heading">캘린더</h2>
+          <div class="calendar">
+            <div class="calendar__nav">
+              <button type="button" class="calendar__nav-btn" id="calendarPrev" aria-label="이전 달">&larr;</button>
+              <span class="calendar__month" id="calendarMonthTitle"></span>
+              <button type="button" class="calendar__nav-btn" id="calendarNext" aria-label="다음 달">&rarr;</button>
+            </div>
+            <div class="calendar__weekdays">
+              <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+            </div>
+            <div class="calendar__grid" id="calendarGrid"></div>
+          </div>
+          <div class="calendar__recurring" id="calendarRecurring">
+            <h3 class="calendar__recurring-title">오늘 일정</h3>
+            <ul class="calendar__recurring-list" id="calendarNormalList"></ul>
+          </div>
+        </div>
+        <div class="my-view__trash">
+          <h2 class="my-view__heading">휴지통</h2>
+          <button type="button" class="trash-toggle-btn" id="trashToggleBtn" aria-expanded="false">휴지통 열람</button>
+          <div class="trash-content" id="trashContent" hidden>
+            <ul class="trash-list" id="trashList" aria-label="삭제된 할 일"></ul>
+            <p class="trash-empty" id="trashEmpty" hidden>휴지통이 비어 있습니다.</p>
+            <button type="button" class="trash-empty-btn" id="trashEmptyBtn" hidden aria-label="휴지통 비우기">휴지통 비우기</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <nav class="bottom-nav" role="tablist" aria-label="목록 필터">
+      <button type="button" class="bottom-nav__btn filter-tabs__btn" role="tab" aria-selected="false" data-filter="all">
+        <span class="bottom-nav__icon" aria-hidden="true"><i data-lucide="list-checks"></i></span>
+        <span class="bottom-nav__label">ToDo</span>
+      </button>
+      <button type="button" class="bottom-nav__btn filter-tabs__btn" role="tab" aria-selected="false" data-filter="time">
+        <span class="bottom-nav__icon" aria-hidden="true"><i data-lucide="clock"></i></span>
+        <span class="bottom-nav__label">시간</span>
+      </button>
+      <button type="button" class="bottom-nav__btn filter-tabs__btn is-active" role="tab" aria-selected="true" data-filter="my">
+        <span class="bottom-nav__icon" aria-hidden="true"><i data-lucide="egg"></i></span>
+        <span class="bottom-nav__label">ReBorn</span>
+      </button>
+      <button type="button" class="bottom-nav__btn filter-tabs__btn" role="tab" aria-selected="false" data-filter="snoozed">
+        <span class="bottom-nav__icon" aria-hidden="true"><i data-lucide="egg-fried"></i></span>
+        <span class="bottom-nav__label">미룬 항목</span>
+      </button>
+      <button type="button" class="bottom-nav__btn filter-tabs__btn" role="tab" aria-selected="false" data-filter="settings">
+        <span class="bottom-nav__icon" aria-hidden="true"><i data-lucide="settings"></i></span>
+        <span class="bottom-nav__label">설정</span>
+      </button>
+    </nav>
+  </div>
+
+  <div class="modal-overlay" id="snoozeConfirmModal" role="dialog" aria-modal="true" aria-labelledby="snoozeConfirmTitle" hidden>
+    <div class="modal">
+      <p class="modal__title" id="snoozeConfirmTitle">미루시겠습니까?</p>
+      <div class="modal__actions">
+        <button type="button" class="modal__btn modal__btn--cancel" id="snoozeConfirmCancel">취소</button>
+        <button type="button" class="modal__btn modal__btn--confirm" id="snoozeConfirmOk">미루기</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="deleteConfirmModal" role="dialog" aria-modal="true" aria-labelledby="deleteConfirmTitle" hidden>
+    <div class="modal">
+      <p class="modal__title" id="deleteConfirmTitle">삭제하시겠습니까?</p>
+      <div class="modal__actions">
+        <button type="button" class="modal__btn modal__btn--cancel" id="deleteConfirmCancel">취소</button>
+        <button type="button" class="modal__btn modal__btn--danger" id="deleteConfirmOk">삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="colorPickerModal" role="dialog" aria-modal="true" aria-labelledby="colorPickerTitle" hidden>
+    <div class="modal">
+      <p class="modal__title" id="colorPickerTitle">막대 색상 변경</p>
+      <div class="color-picker">
+        <input type="color" id="colorPickerInput" class="color-picker__input" value="#8b5cf6" aria-label="막대 색상 선택">
+      </div>
+      <div class="modal__actions">
+        <button type="button" class="modal__btn modal__btn--cancel" id="colorPickerCancel">취소</button>
+        <button type="button" class="modal__btn modal__btn--confirm" id="colorPickerOk">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="calendarCompleteModal" role="dialog" aria-modal="true" aria-labelledby="calendarCompleteTitle" hidden>
+    <div class="modal">
+      <p class="modal__title" id="calendarCompleteTitle">이 일을 다 마쳤나요?</p>
+      <div class="modal__actions">
+        <button type="button" class="modal__btn modal__btn--cancel" id="calendarCompleteCancel">취소</button>
+        <button type="button" class="modal__btn modal__btn--confirm" id="calendarCompleteAllOk" hidden>전부 완료</button>
+        <button type="button" class="modal__btn modal__btn--confirm" id="calendarCompleteOk">완료</button>
+      </div>
+    </div>
+  </div>
+
+  <template id="todoItemTemplate">
+    <li class="todo-item" data-id="">
+      <div class="todo-item__row">
+        <input type="checkbox" class="todo-item__check" id="" aria-label="완료 처리">
+        <div class="todo-item__body">
+          <label class="todo-item__label" for=""></label>
+          <div class="todo-item__meta">
+            <time class="todo-item__time" datetime="" aria-hidden="true"></time>
+            <span class="todo-item__due-inline" aria-hidden="true"></span>
+            <span class="todo-item__tags-inline" aria-hidden="true"></span>
+          </div>
+        </div>
+        <input type="text" class="todo-item__edit" value="" aria-label="할 일 수정" maxlength="200" hidden>
+        <div class="todo-item__row-actions">
+          <div class="todo-item__snooze">
+            <button type="button" class="todo-item__btn todo-item__btn--unsnooze" aria-label="미룬 항목 지금 꺼내기" hidden>지금 꺼내기</button>
+            <button type="button" class="todo-item__btn todo-item__btn--snooze" aria-label="미루기" aria-expanded="false" aria-haspopup="true">미루기</button>
+            <div class="todo-item__snooze-dropdown" hidden>
+              <button type="button" class="todo-item__snooze-option" data-snooze="tomorrow">내일로 미루기</button>
+              <button type="button" class="todo-item__snooze-option" data-snooze="date">날짜 선택</button>
+              <div class="todo-item__snooze-date-wrap" hidden>
+                <input type="date" class="todo-item__snooze-date" aria-label="다시 나타날 날짜">
+              </div>
+            </div>
+          </div>
+          <div class="todo-item__actions">
+            <button type="button" class="todo-item__btn todo-item__btn--edit" aria-label="수정">수정</button>
+            <button type="button" class="todo-item__btn todo-item__btn--delete" aria-label="삭제">삭제</button>
+          </div>
+        </div>
+      </div>
+      <div class="todo-item__subtasks-list-wrap is-empty" aria-label="항목 목록">
+        <ul class="todo-subtask-list"></ul>
+      </div>
+      <div class="todo-item__extra">
+        <div class="todo-item__extra-toolbar">
+          <div class="todo-item__extra-toggles">
+            <button type="button" class="todo-item__extra-toggle" data-panel="subtasks" aria-expanded="false">항목 추가</button>
+            <button type="button" class="todo-item__extra-toggle" data-panel="tags" aria-expanded="false">태그</button>
+          </div>
+          <div class="todo-item__row-actions todo-item__row-actions--mobile" aria-hidden="true">
+            <div class="todo-item__snooze todo-item__snooze--mobile">
+              <button type="button" class="todo-item__btn todo-item__btn--unsnooze" aria-label="미룬 항목 지금 꺼내기" hidden>지금 꺼내기</button>
+              <button type="button" class="todo-item__btn todo-item__btn--snooze" aria-label="미루기" aria-expanded="false" aria-haspopup="true">미루기</button>
+              <div class="todo-item__snooze-dropdown" hidden>
+                <button type="button" class="todo-item__snooze-option" data-snooze="tomorrow">내일로 미루기</button>
+                <button type="button" class="todo-item__snooze-option" data-snooze="date">날짜 선택</button>
+                <div class="todo-item__snooze-date-wrap" hidden>
+                  <input type="date" class="todo-item__snooze-date" aria-label="다시 나타날 날짜">
+                </div>
+              </div>
+            </div>
+            <div class="todo-item__actions">
+              <button type="button" class="todo-item__btn todo-item__btn--edit" aria-label="수정">수정</button>
+              <button type="button" class="todo-item__btn todo-item__btn--delete" aria-label="삭제">삭제</button>
+            </div>
+          </div>
+        </div>
+        <div class="todo-item__subtasks-wrap is-hidden" data-panel="subtasks">
+          <div class="todo-subtask-add">
+            <input type="text" class="todo-subtask-add__input" placeholder="항목 추가" maxlength="120" aria-label="항목 입력">
+            <button type="button" class="todo-item__btn todo-subtask-add__btn" aria-label="항목 추가">+</button>
+          </div>
+        </div>
+        <div class="todo-item__tags-wrap is-hidden" data-panel="tags">
+          <div class="todo-item__tags" aria-label="태그"></div>
+          <div class="todo-tag-add">
+            <input type="text" class="todo-tag-add__input" placeholder="태그 추가" maxlength="20" aria-label="태그 입력">
+            <button type="button" class="todo-item__btn todo-tag-add__btn" aria-label="태그 추가">+</button>
+          </div>
+        </div>
+      </div>
+    </li>
+  </template>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="app.js"></script>
+</body>
+</html>
