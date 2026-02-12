@@ -9,7 +9,7 @@ const THEME_KEY = "todoapp-theme";
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => el.querySelectorAll(sel);
 
-/** @typedef {{ id: string; title: string; completed: boolean; createdAt: string; snoozeUntil?: string | null; dueDate?: string | null; dueEndDate?: string | null; repeatDays?: number[]; scheduleColor?: string | null; completedDates?: string[]; subtasks?: { id: string; title: string; completed: boolean }[]; tags?: string[]; deletedAt?: string }} Todo */
+/** @typedef {{ id: string; title: string; completed: boolean; createdAt: string; snoozeUntil?: string | null; dueDate?: string | null; dueEndDate?: string | null; repeatDays?: number[]; scheduleColor?: string | null; completedDates?: string[]; completedAt?: string | null; subtasks?: { id: string; title: string; completed: boolean }[]; tags?: string[]; deletedAt?: string }} Todo */
 
 /** @type {Todo[]} */
 let todos = [];
@@ -58,7 +58,13 @@ const trashList = $("#trashList");
 const trashEmpty = $("#trashEmpty");
 const trashEmptyBtn = $("#trashEmptyBtn");
 const calendarNormalList = $("#calendarNormalList");
+const calendarUpcomingList = $("#calendarUpcomingList");
+const calendarCompletedList = $("#calendarCompletedList");
+const calendarCompletedToggleBtn = $("#calendarCompletedToggleBtn");
+const calendarCompletedContent = $("#calendarCompletedContent");
 const trashToggleBtn = $("#trashToggleBtn");
+const trashToggleLabel = $("#trashToggleLabel");
+const calendarCompletedToggleLabel = $("#calendarCompletedToggleLabel");
 const trashContent = $("#trashContent");
 const appEl = $(".app");
 
@@ -74,10 +80,23 @@ let currentTagFilter = null;
 let pendingColorTodoId = null;
 let prioritizeIncomplete = false;
 let trashOpen = false;
+let calendarCompletedOpen = false;
 /** @type {{ [todoId: string]: { subtasks?: boolean; tags?: boolean } }} */
 let expandedPanelsByTodo = {};
 /** 방금 추가된 할 일 ID (추가 애니메이션용) */
 let lastAddedTodoId = null;
+
+function setCalendarCompletedOpen(open) {
+  calendarCompletedOpen = !!open;
+  renderCalendar();
+}
+
+function updateDisclosureSection(contentEl, buttonEl, labelEl, isOpen, openText, closeText) {
+  if (contentEl) contentEl.hidden = !isOpen;
+  if (!buttonEl) return;
+  if (labelEl) labelEl.textContent = isOpen ? closeText : openText;
+  buttonEl.setAttribute("aria-expanded", isOpen ? "true" : "false");
+}
 
 // ——— 테마 ———
 function getStoredTheme() {
@@ -250,6 +269,7 @@ function ensureTodoShape(todo) {
   if (todo.dueDate === undefined) todo.dueDate = null;
   if (todo.dueEndDate === undefined) todo.dueEndDate = null;
   if (todo.scheduleColor === undefined) todo.scheduleColor = null;
+  if (todo.completedAt === undefined) todo.completedAt = null;
   if (!todo.completedDates || !Array.isArray(todo.completedDates)) todo.completedDates = [];
   if (!todo.repeatDays || !Array.isArray(todo.repeatDays)) todo.repeatDays = [];
   todo.subtasks = todo.subtasks.map((st) => ({
@@ -457,10 +477,19 @@ function markOccurrenceDone(todo, dateStr) {
     return;
   }
   todo.completed = true;
+  todo.completedAt = dateStr;
 }
 
 function isTodoCompletedForList(todo) {
   return isOccurrenceDone(todo, todayDateStr());
+}
+
+function shouldHidePastCompletedInTodo(todo, today = todayDateStr()) {
+  if (!isTodoCompletedForList(todo)) return false;
+  if (todo.repeatDays && todo.repeatDays.length > 0) return false;
+  const { start, end } = getEffectiveDateRange(todo);
+  const ref = end || start;
+  return !!(ref && ref < today);
 }
 
 function buildCalendarBarSegments(todo, weekDates, startCol, span, color, title, allStartCol = startCol, allSpan = span) {
@@ -545,6 +574,7 @@ function getFilteredTodos() {
     filtered = todos.filter((t) => t.snoozeUntil && t.snoozeUntil > today);
   } else {
     filtered = todos.filter((t) => !t.snoozeUntil || t.snoozeUntil <= today);
+    filtered = filtered.filter((t) => !shouldHidePastCompletedInTodo(t, today));
     if (currentFilter === "active") filtered = filtered.filter((t) => !isTodoCompletedForList(t));
     else if (currentFilter === "completed") filtered = filtered.filter((t) => isTodoCompletedForList(t));
   }
@@ -613,26 +643,6 @@ function getTodosForDate(year, month, date) {
   });
 }
 
-/** 반복 요일 배열에서 연속된 구간(run) 목록. 예: [1,2,3] → [{start:1,len:3}] */
-function getConsecutiveRuns(days) {
-  if (!days || days.length === 0) return [];
-  const sorted = [...days].sort((a, b) => a - b);
-  const runs = [];
-  let start = sorted[0];
-  let len = 1;
-  for (let i = 1; i < sorted.length; i++) {
-    if (sorted[i] === sorted[i - 1] + 1) {
-      len++;
-    } else {
-      runs.push({ start, len });
-      start = sorted[i];
-      len = 1;
-    }
-  }
-  runs.push({ start, len });
-  return runs;
-}
-
 /** 반복 요일이 있는 할 일 (요일 합쳐서 한 줄로 표시) */
 function getRecurringTodos() {
   return todos.filter((t) => t.repeatDays && t.repeatDays.length > 0 && !isFutureSnoozed(t));
@@ -644,18 +654,92 @@ function getTodayScheduleTodos() {
   return todos.filter((t) => {
     if (isFutureSnoozed(t)) return false;
     const hasRepeat = !!(t.repeatDays && t.repeatDays.length > 0);
-    if (hasRepeat) return t.repeatDays.includes(todayDow);
+    if (hasRepeat) {
+      const { start } = getEffectiveDateRange(t);
+      if (!start) return false;
+      return today >= start && t.repeatDays.includes(todayDow);
+    }
     const { start, end } = getEffectiveDateRange(t);
     if (!start || !end) return false;
     return start <= today && today <= end;
   });
 }
 
+function getUpcomingScheduleTodos() {
+  const today = todayDateStr();
+  return todos
+    .filter((t) => {
+      if (isFutureSnoozed(t)) return false;
+      if (t.repeatDays && t.repeatDays.length > 0) {
+        const next = getNextRecurringDateStr(t, today);
+        return !!next && next > today;
+      }
+      const { start } = getEffectiveDateRange(t);
+      return !!start && start > today;
+    })
+    .sort((a, b) => {
+      const aDate = (a.repeatDays && a.repeatDays.length > 0) ? (getNextRecurringDateStr(a, today) || "9999-12-31") : (getEffectiveDateRange(a).start || "9999-12-31");
+      const bDate = (b.repeatDays && b.repeatDays.length > 0) ? (getNextRecurringDateStr(b, today) || "9999-12-31") : (getEffectiveDateRange(b).start || "9999-12-31");
+      if (aDate !== bDate) return aDate.localeCompare(bDate);
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+}
+
+function getConsecutiveDateRuns(dateList) {
+  const valid = [...new Set((dateList || []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)))].sort();
+  if (valid.length === 0) return [];
+  const runs = [];
+  let start = valid[0];
+  let prev = valid[0];
+  for (let i = 1; i < valid.length; i++) {
+    if (valid[i] === addDaysDateStr(prev, 1)) {
+      prev = valid[i];
+    } else {
+      runs.push({ start, end: prev });
+      start = valid[i];
+      prev = valid[i];
+    }
+  }
+  runs.push({ start, end: prev });
+  return runs;
+}
+
+function getCompletedScheduleEntries() {
+  /** @type {{ date: string; todo: Todo; rangeText?: string }}[] */
+  const entries = [];
+  todos.forEach((t) => {
+    if (isFutureSnoozed(t)) return;
+    const isRecurring = !!(t.repeatDays && t.repeatDays.length > 0);
+    const { start, end } = getEffectiveDateRange(t);
+    const isRange = !!(start && end && start !== end);
+    if (isRecurring || isRange) {
+      const runs = getConsecutiveDateRuns(t.completedDates || []);
+      runs.forEach((run) => {
+        const rangeText = run.start === run.end
+          ? formatShortDateYYMMDD(run.start)
+          : `${formatShortDateYYMMDD(run.start)} - ${formatShortDateYYMMDD(run.end)}`;
+        entries.push({ date: run.start, todo: t, rangeText });
+      });
+      return;
+    }
+    if (t.completed) {
+      const doneDate = t.completedAt || end || start || toLocalDateStr(t.createdAt);
+      if (doneDate) entries.push({ date: doneDate, todo: t, rangeText: formatShortDateYYMMDD(doneDate) });
+    }
+  });
+  return entries.sort((a, b) => {
+    if (a.date !== b.date) return b.date.localeCompare(a.date);
+    return new Date(b.todo.createdAt) - new Date(a.todo.createdAt);
+  });
+}
+
 function getNextRecurringDateStr(todo, fromDateStr = todayDateStr()) {
   const days = todo?.repeatDays || [];
   if (!Array.isArray(days) || days.length === 0) return null;
-  for (let i = 0; i < 14; i++) {
-    const d = addDaysDateStr(fromDateStr, i);
+  const { start } = getEffectiveDateRange(todo);
+  const base = start && fromDateStr < start ? start : fromDateStr;
+  for (let i = 0; i < 21; i++) {
+    const d = addDaysDateStr(base, i);
     const dow = new Date(`${d}T00:00:00`).getDay();
     if (days.includes(dow)) return d;
   }
@@ -792,20 +876,33 @@ function renderCalendar() {
     let barsHtml = "";
     const barRows = [];
     recurring.forEach((t) => {
-      const runs = getConsecutiveRuns(t.repeatDays || []);
+      const { start } = getEffectiveDateRange(t);
+      if (!start) return;
       const color = getScheduleBarColor(t);
       let row = "";
       let col = 0;
-      runs.forEach((run) => {
-        if (run.start > col) {
-          row += `<div class="calendar__bar calendar__bar--empty" style="grid-column: span ${run.start - col};"></div>`;
-          col = run.start;
+      while (col < 7) {
+        const isActive = weekDates[col] >= start && (t.repeatDays || []).includes(col);
+        if (!isActive) {
+          let emptyLen = 1;
+          while (col + emptyLen < 7) {
+            const nextActive = weekDates[col + emptyLen] >= start && (t.repeatDays || []).includes(col + emptyLen);
+            if (nextActive) break;
+            emptyLen += 1;
+          }
+          row += `<div class="calendar__bar calendar__bar--empty" style="grid-column: span ${emptyLen};"></div>`;
+          col += emptyLen;
+          continue;
         }
-        row += buildCalendarBarSegments(t, weekDates, run.start, run.len, color, t.title, run.start, run.len);
-        col += run.len;
-      });
-      if (col < 7) {
-        row += `<div class="calendar__bar calendar__bar--empty" style="grid-column: span ${7 - col};"></div>`;
+        const segStart = col;
+        let segLen = 1;
+        while (segStart + segLen < 7) {
+          const nextActive = weekDates[segStart + segLen] >= start && (t.repeatDays || []).includes(segStart + segLen);
+          if (!nextActive) break;
+          segLen += 1;
+        }
+        row += buildCalendarBarSegments(t, weekDates, segStart, segLen, color, t.title, segStart, segLen);
+        col = segStart + segLen;
       }
       barRows.push(`<div class="calendar__bar-row">${row}</div>`);
     });
@@ -860,16 +957,69 @@ function renderCalendar() {
       calendarNormalList.appendChild(li);
     });
   }
+
+  if (calendarUpcomingList) {
+    const today = todayDateStr();
+    const upcomingTodos = getUpcomingScheduleTodos();
+    calendarUpcomingList.innerHTML = "";
+    if (upcomingTodos.length === 0) {
+      const li = document.createElement("li");
+      li.className = "calendar__recurring-item";
+      li.innerHTML = `<span class="calendar__recurring-task">다가오는 일정이 없습니다.</span>`;
+      calendarUpcomingList.appendChild(li);
+    }
+    upcomingTodos.forEach((t) => {
+      const li = document.createElement("li");
+      li.className = "calendar__recurring-item";
+      const color = getScheduleBarColor(t);
+      const nextDate = (t.repeatDays && t.repeatDays.length > 0) ? getNextRecurringDateStr(t, today) : getEffectiveDateRange(t).start;
+      const dateLabel = nextDate ? `D-${Math.max(0, Math.floor((new Date(`${nextDate}T00:00:00`) - new Date(`${today}T00:00:00`)) / 86400000))}` : "";
+      li.innerHTML = `<span class="calendar__recurring-task">${escapeHtml(t.title)}</span>${dateLabel ? `<span class="calendar__recurring-label">${dateLabel}</span>` : ""}<button type="button" class="calendar__recurring-color-btn" aria-label="막대 색상 변경" style="background:${color.bg};"></button>`;
+      li.querySelector(".calendar__recurring-color-btn")?.addEventListener("click", () => openColorPickerForTodo(t));
+      calendarUpcomingList.appendChild(li);
+    });
+  }
+
+  if (calendarCompletedList) {
+    updateDisclosureSection(
+      calendarCompletedContent,
+      calendarCompletedToggleBtn,
+      calendarCompletedToggleLabel,
+      calendarCompletedOpen,
+      "완료 일정 열람",
+      "완료 일정 닫기"
+    );
+    if (!calendarCompletedOpen) return;
+    const entries = getCompletedScheduleEntries();
+    calendarCompletedList.innerHTML = "";
+    if (entries.length === 0) {
+      const li = document.createElement("li");
+      li.className = "calendar__recurring-item";
+      li.innerHTML = `<span class="calendar__recurring-task">완료한 일정이 없습니다.</span>`;
+      calendarCompletedList.appendChild(li);
+    }
+    entries.forEach(({ todo, rangeText }) => {
+      const li = document.createElement("li");
+      li.className = "calendar__recurring-item";
+      const color = getScheduleBarColor(todo);
+      li.innerHTML = `<span class="calendar__recurring-task calendar__recurring-task--done">${escapeHtml(todo.title)}</span>${rangeText ? `<span class="calendar__recurring-label">${rangeText}</span>` : ""}<span class="calendar__recurring-status">완료</span><button type="button" class="calendar__recurring-color-btn" aria-label="막대 색상 변경" style="background:${color.bg};"></button>`;
+      li.querySelector(".calendar__recurring-color-btn")?.addEventListener("click", () => openColorPickerForTodo(todo));
+      calendarCompletedList.appendChild(li);
+    });
+  }
 }
 
 function renderTrash() {
   if (currentFilter !== "my") return;
   if (!trashList || !trashEmpty || !trashEmptyBtn) return;
-  if (trashContent) trashContent.hidden = !trashOpen;
-  if (trashToggleBtn) {
-    trashToggleBtn.textContent = trashOpen ? "휴지통 닫기" : "휴지통 열람";
-    trashToggleBtn.setAttribute("aria-expanded", trashOpen ? "true" : "false");
-  }
+  updateDisclosureSection(
+    trashContent,
+    trashToggleBtn,
+    trashToggleLabel,
+    trashOpen,
+    "휴지통 열람",
+    "휴지통 닫기"
+  );
   if (!trashOpen) return;
 
   trashList.innerHTML = "";
@@ -1378,6 +1528,7 @@ function addTodo(title, dueDate = null, repeatDays = [], dueEndDate = null) {
     dueEndDate: normalizedEnd,
     repeatDays: Array.isArray(repeatDays) ? repeatDays : [],
     scheduleColor: null,
+    completedAt: null,
     subtasks: [],
     tags: [],
   };
@@ -1410,6 +1561,7 @@ function toggleComplete(id) {
     }
   } else {
     todo.completed = !todo.completed;
+    todo.completedAt = todo.completed ? todayDateStr() : null;
   }
   saveTodos();
   renderList();
@@ -1688,6 +1840,12 @@ if (trashToggleBtn) {
   trashToggleBtn.addEventListener("click", () => {
     trashOpen = !trashOpen;
     renderTrash();
+  });
+}
+if (calendarCompletedToggleBtn) {
+  calendarCompletedToggleBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    setCalendarCompletedOpen(!calendarCompletedOpen);
   });
 }
 

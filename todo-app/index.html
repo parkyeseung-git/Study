@@ -131,11 +131,24 @@
           <div class="calendar__recurring" id="calendarRecurring">
             <h3 class="calendar__recurring-title">오늘 일정</h3>
             <ul class="calendar__recurring-list" id="calendarNormalList"></ul>
+            <h3 class="calendar__recurring-title">다가오는 일정</h3>
+            <ul class="calendar__recurring-list" id="calendarUpcomingList"></ul>
+            <h3 class="calendar__recurring-title">완료 일정</h3>
+            <button type="button" class="trash-toggle-btn" id="calendarCompletedToggleBtn" aria-expanded="false">
+              <span id="calendarCompletedToggleLabel">완료 일정 열람</span>
+              <span class="section-toggle__icon" aria-hidden="true"><i data-lucide="chevron-down"></i></span>
+            </button>
+            <div class="trash-content" id="calendarCompletedContent" hidden>
+              <ul class="calendar__recurring-list" id="calendarCompletedList"></ul>
+            </div>
           </div>
         </div>
         <div class="my-view__trash">
           <h2 class="my-view__heading">휴지통</h2>
-          <button type="button" class="trash-toggle-btn" id="trashToggleBtn" aria-expanded="false">휴지통 열람</button>
+          <button type="button" class="trash-toggle-btn" id="trashToggleBtn" aria-expanded="false">
+            <span id="trashToggleLabel">휴지통 열람</span>
+            <span class="section-toggle__icon" aria-hidden="true"><i data-lucide="chevron-down"></i></span>
+          </button>
           <div class="trash-content" id="trashContent" hidden>
             <ul class="trash-list" id="trashList" aria-label="삭제된 할 일"></ul>
             <p class="trash-empty" id="trashEmpty" hidden>휴지통이 비어 있습니다.</p>
