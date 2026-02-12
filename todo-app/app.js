@@ -662,6 +662,16 @@ function getNextRecurringDateStr(todo, fromDateStr = todayDateStr()) {
   return null;
 }
 
+function getDdayLabel(targetDateStr, baseDateStr = todayDateStr()) {
+  if (!targetDateStr || !/^\d{4}-\d{2}-\d{2}$/.test(targetDateStr)) return "";
+  const target = new Date(`${targetDateStr}T00:00:00`);
+  const base = new Date(`${baseDateStr}T00:00:00`);
+  const diffDays = Math.floor((target - base) / 86400000);
+  if (diffDays < 0) return "";
+  if (diffDays === 0) return "D-day";
+  return `D-${diffDays}`;
+}
+
 const WEEKDAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 const SCHEDULE_BAR_COLORS = [
   { bg: "#8B5CF6", fg: "#FFFFFF" },
@@ -1080,6 +1090,9 @@ function renderList() {
         const names = ["일", "월", "화", "수", "목", "금", "토"];
         parts.push("매주 " + todo.repeatDays.map((d) => names[d]).join(", "));
       }
+      const targetForDday = (todo.repeatDays || []).length > 0 ? getNextRecurringDateStr(todo) : start;
+      const dday = getDdayLabel(targetForDday);
+      if (dday) parts.push(dday);
       dueInlineEl.textContent = parts.join(" · ");
       dueInlineEl.hidden = parts.length === 0;
     }
