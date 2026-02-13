@@ -157,6 +157,211 @@
         </div>
       </section>
 
+      <!-- 시간 뷰: 스톱워치 + 타이머 + 시간 트래킹 -->
+      <section class="time-view" id="timeView" hidden aria-label="시간">
+        <div class="time-view__container">
+
+          <!-- 할일별 시간 트래킹 -->
+          <div class="time-card time-card--full">
+            <h2 class="time-card__title">할일별 시간 트래킹</h2>
+            <p class="time-card__desc">ToDo 탭에서 할일을 선택하고 시간을 측정하세요</p>
+            <ul class="time-tracking-list" id="timeTrackingList">
+              <!-- JS로 렌더링 -->
+            </ul>
+            <button type="button" class="time-tracking-more-btn" id="timeTrackingMoreBtn" hidden>더보기</button>
+          </div>
+
+          <!-- 스톱워치 -->
+          <div class="time-card">
+            <h2 class="time-card__title">스톱워치</h2>
+            <div class="time-display" id="stopwatchDisplay">00:00:00</div>
+            <div class="time-controls">
+              <button type="button" class="time-btn time-btn--primary" id="stopwatchStartBtn">시작</button>
+              <button type="button" class="time-btn time-btn--secondary" id="stopwatchResetBtn">리셋</button>
+            </div>
+          </div>
+
+          <!-- 타이머 (카운트다운) -->
+          <div class="time-card">
+            <h2 class="time-card__title">타이머</h2>
+            <div class="timer-input-group">
+              <div class="timer-picker">
+                <button type="button" class="timer-picker__trigger" id="timerHoursTrigger" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="timer-picker__value" id="timerHoursValue">00</span>
+                  <span class="timer-picker__unit">시</span>
+                  <span class="timer-picker__chevron" aria-hidden="true"><i data-lucide="chevron-down"></i></span>
+                </button>
+                <div class="timer-picker__menu" id="timerHoursMenu" role="listbox" aria-label="시간 선택" hidden></div>
+                <select id="timerHours" class="timer-select-native" aria-label="시간" hidden></select>
+              </div>
+              <div class="timer-picker">
+                <button type="button" class="timer-picker__trigger" id="timerMinutesTrigger" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="timer-picker__value" id="timerMinutesValue">00</span>
+                  <span class="timer-picker__unit">분</span>
+                  <span class="timer-picker__chevron" aria-hidden="true"><i data-lucide="chevron-down"></i></span>
+                </button>
+                <div class="timer-picker__menu" id="timerMinutesMenu" role="listbox" aria-label="분 선택" hidden></div>
+                <select id="timerMinutes" class="timer-select-native" aria-label="분" hidden></select>
+              </div>
+              <div class="timer-picker">
+                <button type="button" class="timer-picker__trigger" id="timerSecondsTrigger" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="timer-picker__value" id="timerSecondsValue">00</span>
+                  <span class="timer-picker__unit">초</span>
+                  <span class="timer-picker__chevron" aria-hidden="true"><i data-lucide="chevron-down"></i></span>
+                </button>
+                <div class="timer-picker__menu" id="timerSecondsMenu" role="listbox" aria-label="초 선택" hidden></div>
+                <select id="timerSeconds" class="timer-select-native" aria-label="초" hidden></select>
+              </div>
+            </div>
+            <div class="time-display" id="timerDisplay">00:00:00</div>
+            <div class="time-controls">
+              <button type="button" class="time-btn time-btn--primary" id="timerStartBtn">시작</button>
+              <button type="button" class="time-btn time-btn--secondary" id="timerResetBtn">리셋</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 설정 뷰 -->
+      <section class="settings-view" id="settingsView" hidden aria-label="설정">
+        <div class="settings-container">
+
+          <!-- 외관 -->
+          <div class="settings-group">
+            <button type="button" class="settings-group__toggle" id="settingsAppearanceToggle" data-target="settingsAppearanceContent" aria-expanded="false">
+              <span class="settings-group__toggle-title">외관</span>
+              <span class="settings-group__toggle-icon" aria-hidden="true"><i data-lucide="chevron-down"></i></span>
+            </button>
+            <div class="settings-group__content" id="settingsAppearanceContent" hidden>
+              <div class="settings-item">
+                <label for="fontSizeSelect" class="settings-item__label">폰트 크기</label>
+                <select id="fontSizeSelect" class="settings-select">
+                  <option value="small">소</option>
+                  <option value="medium" selected>중</option>
+                  <option value="large">대</option>
+                </select>
+              </div>
+
+              <div class="settings-item">
+                <label for="weekStartSelect" class="settings-item__label">캘린더 주 시작</label>
+                <select id="weekStartSelect" class="settings-select">
+                  <option value="0" selected>일요일</option>
+                  <option value="1">월요일</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 알림/자동화 -->
+          <div class="settings-group">
+            <button type="button" class="settings-group__toggle" id="settingsNotifyToggle" data-target="settingsNotifyContent" aria-expanded="false">
+              <span class="settings-group__toggle-title">알림 및 자동화</span>
+              <span class="settings-group__toggle-icon" aria-hidden="true"><i data-lucide="chevron-down"></i></span>
+            </button>
+            <div class="settings-group__content" id="settingsNotifyContent" hidden>
+              <div class="settings-item settings-item--switch">
+                <label for="notificationsToggle" class="settings-item__label">
+                  브라우저 알림
+                  <span class="settings-item__desc">일정 시작 전 알림을 받습니다</span>
+                </label>
+                <input type="checkbox" id="notificationsToggle" class="settings-toggle" aria-label="브라우저 알림 토글">
+              </div>
+
+              <div class="settings-item" id="notificationTimingGroup" hidden>
+                <label class="settings-item__label">일일 알림 시각</label>
+                <div class="settings-time-pickers">
+                  <div class="settings-time-picker">
+                    <button type="button" class="settings-time-picker__trigger" id="dailyAlertPeriodTrigger" aria-haspopup="listbox" aria-expanded="false">
+                      <span class="settings-time-picker__value" id="dailyAlertPeriodValue">오전</span>
+                      <span class="settings-time-picker__chevron" aria-hidden="true"><i data-lucide="chevron-down"></i></span>
+                    </button>
+                    <div class="settings-time-picker__menu" id="dailyAlertPeriodMenu" role="listbox" aria-label="오전 오후 선택" hidden></div>
+                    <select id="dailyAlertPeriodSelect" class="settings-select-native" aria-label="오전 오후 선택" hidden>
+                      <option value="AM">오전</option>
+                      <option value="PM">오후</option>
+                    </select>
+                  </div>
+                  <div class="settings-time-picker">
+                    <button type="button" class="settings-time-picker__trigger" id="dailyAlertHourTrigger" aria-haspopup="listbox" aria-expanded="false">
+                      <span class="settings-time-picker__value" id="dailyAlertHourValue">09</span>
+                      <span class="settings-time-picker__unit">시</span>
+                      <span class="settings-time-picker__chevron" aria-hidden="true"><i data-lucide="chevron-down"></i></span>
+                    </button>
+                    <div class="settings-time-picker__menu" id="dailyAlertHourMenu" role="listbox" aria-label="시간 선택" hidden></div>
+                    <select id="dailyAlertHourSelect" class="settings-select-native" aria-label="시간 선택" hidden></select>
+                  </div>
+                  <div class="settings-time-picker">
+                    <button type="button" class="settings-time-picker__trigger" id="dailyAlertMinuteTrigger" aria-haspopup="listbox" aria-expanded="false">
+                      <span class="settings-time-picker__value" id="dailyAlertMinuteValue">00</span>
+                      <span class="settings-time-picker__unit">분</span>
+                      <span class="settings-time-picker__chevron" aria-hidden="true"><i data-lucide="chevron-down"></i></span>
+                    </button>
+                    <div class="settings-time-picker__menu" id="dailyAlertMinuteMenu" role="listbox" aria-label="분 선택" hidden></div>
+                    <select id="dailyAlertMinuteSelect" class="settings-select-native" aria-label="분 선택" hidden></select>
+                  </div>
+                </div>
+
+                <label class="settings-item__label" style="margin-top: 1rem;">알림 설정</label>
+                <div class="settings-checkboxes">
+                  <label class="settings-check-chip"><input type="checkbox" class="advance-days-cb" value="0"> <span>당일</span></label>
+                  <label class="settings-check-chip"><input type="checkbox" class="advance-days-cb" value="1"> <span>1일 전</span></label>
+                  <label class="settings-check-chip"><input type="checkbox" class="advance-days-cb" value="3"> <span>3일 전</span></label>
+                  <label class="settings-check-chip"><input type="checkbox" class="advance-days-cb" value="7"> <span>7일 전</span></label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 데이터 관리 -->
+          <div class="settings-group">
+            <button type="button" class="settings-group__toggle" id="settingsDataToggle" data-target="settingsDataContent" aria-expanded="false">
+              <span class="settings-group__toggle-title">데이터 관리</span>
+              <span class="settings-group__toggle-icon" aria-hidden="true"><i data-lucide="chevron-down"></i></span>
+            </button>
+            <div class="settings-group__content" id="settingsDataContent" hidden>
+              <div class="settings-item">
+                <label for="autoCleanupCompletedInput" class="settings-item__label">
+                  완료 항목 자동 정리
+                  <span class="settings-item__desc">완료 후 N일 경과 시 휴지통으로 이동 (0 입력 시 비활성화)</span>
+                </label>
+                <div class="settings-time-picker settings-time-picker--days">
+                  <button type="button" class="settings-time-picker__trigger" id="autoCleanupCompletedTrigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="settings-time-picker__value" id="autoCleanupCompletedValue">0</span>
+                    <span class="settings-time-picker__unit">일</span>
+                    <span class="settings-time-picker__chevron" aria-hidden="true"><i data-lucide="chevron-down"></i></span>
+                  </button>
+                  <div class="settings-time-picker__menu" id="autoCleanupCompletedMenu" role="listbox" aria-label="완료 항목 자동 정리 일수 선택" hidden></div>
+                  <select id="autoCleanupCompletedInput" class="settings-select-native" aria-label="완료 항목 자동 정리 일수 선택" hidden></select>
+                </div>
+              </div>
+
+              <div class="settings-item">
+                <label for="autoCleanupTrashedInput" class="settings-item__label">
+                  휴지통 자동 비우기
+                  <span class="settings-item__desc">삭제 후 N일 경과 시 영구 삭제 (0 입력 시 비활성화)</span>
+                </label>
+                <div class="settings-time-picker settings-time-picker--days">
+                  <button type="button" class="settings-time-picker__trigger" id="autoCleanupTrashedTrigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="settings-time-picker__value" id="autoCleanupTrashedValue">0</span>
+                    <span class="settings-time-picker__unit">일</span>
+                    <span class="settings-time-picker__chevron" aria-hidden="true"><i data-lucide="chevron-down"></i></span>
+                  </button>
+                  <div class="settings-time-picker__menu" id="autoCleanupTrashedMenu" role="listbox" aria-label="휴지통 자동 비우기 일수 선택" hidden></div>
+                  <select id="autoCleanupTrashedInput" class="settings-select-native" aria-label="휴지통 자동 비우기 일수 선택" hidden></select>
+                </div>
+              </div>
+
+              <div class="settings-item">
+                <button type="button" class="settings-btn settings-btn--danger" id="resetAllDataBtn">모든 데이터 초기화</button>
+                <p class="settings-item__warning"><span class="settings-item__warning-icon" aria-hidden="true"><i data-lucide="shield-alert"></i></span> 모든 할일, 휴지통, 설정이 삭제됩니다. 복구할 수 없습니다.</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
     </main>
 
     <nav class="bottom-nav" role="tablist" aria-label="목록 필터">
@@ -203,6 +408,16 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="completionConfirmModal" role="dialog" aria-modal="true" aria-labelledby="completionConfirmTitle" hidden>
+    <div class="modal">
+      <p class="modal__title" id="completionConfirmTitle">일정을 완료했나요?</p>
+      <div class="modal__actions">
+        <button type="button" class="modal__btn modal__btn--cancel" id="completionConfirmNo">아니요</button>
+        <button type="button" class="modal__btn modal__btn--confirm" id="completionConfirmYes">네</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="colorPickerModal" role="dialog" aria-modal="true" aria-labelledby="colorPickerTitle" hidden>
     <div class="modal">
       <p class="modal__title" id="colorPickerTitle">막대 색상 변경</p>
@@ -227,6 +442,38 @@
     </div>
   </div>
 
+  <!-- 타이머 완료 모달 -->
+  <div class="modal-overlay" id="timerCompleteModal" role="dialog" aria-modal="true" aria-labelledby="timerCompleteTitle" hidden>
+    <div class="modal">
+      <p class="modal__title" id="timerCompleteTitle">타이머 완료!</p>
+      <p class="modal__message">설정한 시간이 모두 지났습니다.</p>
+      <div class="modal__actions">
+        <button type="button" class="modal__btn modal__btn--confirm" id="timerCompleteOk">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="timerConfigModal" role="dialog" aria-modal="true" aria-labelledby="timerConfigTitle" hidden>
+    <div class="modal">
+      <p class="modal__title" id="timerConfigTitle">타이머 시간을 선택해 주세요.</p>
+      <div class="modal__actions">
+        <button type="button" class="modal__btn modal__btn--confirm" id="timerConfigOk">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 데이터 초기화 확인 모달 -->
+  <div class="modal-overlay" id="resetDataConfirmModal" role="dialog" aria-modal="true" aria-labelledby="resetDataTitle" hidden>
+    <div class="modal">
+      <p class="modal__title" id="resetDataTitle">정말로 모든 데이터를 삭제하시겠습니까?</p>
+      <p class="modal__message">이 작업은 되돌릴 수 없습니다.</p>
+      <div class="modal__actions">
+        <button type="button" class="modal__btn modal__btn--cancel" id="resetDataCancel">취소</button>
+        <button type="button" class="modal__btn modal__btn--danger" id="resetDataOk">삭제</button>
+      </div>
+    </div>
+  </div>
+
   <template id="todoItemTemplate">
     <li class="todo-item" data-id="">
       <div class="todo-item__row">
@@ -240,6 +487,14 @@
           </div>
         </div>
         <input type="text" class="todo-item__edit" value="" aria-label="할 일 수정" maxlength="200" hidden>
+        <!-- 시간 트래킹 영역 -->
+        <div class="todo-item__time-tracking" hidden>
+          <span class="time-tracking__display" aria-live="polite">00:00:00</span>
+          <button type="button" class="todo-item__btn todo-item__btn--time-start"
+                  aria-label="시간 측정 시작">시작</button>
+          <button type="button" class="todo-item__btn todo-item__btn--time-reset"
+                  aria-label="측정 시간 리셋">리셋</button>
+        </div>
         <div class="todo-item__row-actions">
           <div class="todo-item__snooze">
             <button type="button" class="todo-item__btn todo-item__btn--unsnooze" aria-label="미룬 항목 지금 꺼내기" hidden>지금 꺼내기</button>

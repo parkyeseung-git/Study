@@ -5,11 +5,12 @@
 const STORAGE_KEY = "todoapp-todos";
 const TRASH_STORAGE_KEY = "todoapp-trash";
 const THEME_KEY = "todoapp-theme";
+const SETTINGS_STORAGE_KEY = "todoapp-settings";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => el.querySelectorAll(sel);
 
-/** @typedef {{ id: string; title: string; completed: boolean; createdAt: string; snoozeUntil?: string | null; dueDate?: string | null; dueEndDate?: string | null; repeatDays?: number[]; scheduleColor?: string | null; completedDates?: string[]; completedAt?: string | null; subtasks?: { id: string; title: string; completed: boolean }[]; tags?: string[]; deletedAt?: string }} Todo */
+/** @typedef {{ id: string; title: string; completed: boolean; createdAt: string; snoozeUntil?: string | null; dueDate?: string | null; dueEndDate?: string | null; repeatDays?: number[]; scheduleColor?: string | null; completedDates?: string[]; completedAt?: string | null; subtasks?: { id: string; title: string; completed: boolean }[]; tags?: string[]; deletedAt?: string; timeTracking?: { totalSeconds: number; isRunning: boolean; startTime: number | null } }} Todo */
 
 /** @type {Todo[]} */
 let todos = [];
@@ -32,6 +33,10 @@ const deleteConfirmModal = $("#deleteConfirmModal");
 const deleteConfirmTitle = $("#deleteConfirmTitle");
 const deleteConfirmCancel = $("#deleteConfirmCancel");
 const deleteConfirmOk = $("#deleteConfirmOk");
+const completionConfirmModal = $("#completionConfirmModal");
+const completionConfirmTitle = $("#completionConfirmTitle");
+const completionConfirmNo = $("#completionConfirmNo");
+const completionConfirmYes = $("#completionConfirmYes");
 const colorPickerModal = $("#colorPickerModal");
 const colorPickerInput = $("#colorPickerInput");
 const colorPickerCancel = $("#colorPickerCancel");
@@ -68,6 +73,65 @@ const calendarCompletedToggleLabel = $("#calendarCompletedToggleLabel");
 const trashContent = $("#trashContent");
 const appEl = $(".app");
 
+// 시간 뷰 DOM 참조
+const timeView = $("#timeView");
+const stopwatchDisplay = $("#stopwatchDisplay");
+const stopwatchStartBtn = $("#stopwatchStartBtn");
+const stopwatchResetBtn = $("#stopwatchResetBtn");
+const timerDisplay = $("#timerDisplay");
+const timerStartBtn = $("#timerStartBtn");
+const timerResetBtn = $("#timerResetBtn");
+const timerHoursInput = $("#timerHours");
+const timerMinutesInput = $("#timerMinutes");
+const timerSecondsInput = $("#timerSeconds");
+const timerHoursTrigger = $("#timerHoursTrigger");
+const timerMinutesTrigger = $("#timerMinutesTrigger");
+const timerSecondsTrigger = $("#timerSecondsTrigger");
+const timerHoursValue = $("#timerHoursValue");
+const timerMinutesValue = $("#timerMinutesValue");
+const timerSecondsValue = $("#timerSecondsValue");
+const timerHoursMenu = $("#timerHoursMenu");
+const timerMinutesMenu = $("#timerMinutesMenu");
+const timerSecondsMenu = $("#timerSecondsMenu");
+const timeTrackingList = $("#timeTrackingList");
+const timeTrackingMoreBtn = $("#timeTrackingMoreBtn");
+const timerCompleteModal = $("#timerCompleteModal");
+const timerCompleteOk = $("#timerCompleteOk");
+const timerConfigModal = $("#timerConfigModal");
+const timerConfigOk = $("#timerConfigOk");
+
+// 설정 뷰 DOM 참조
+const settingsView = $("#settingsView");
+const fontSizeSelect = $("#fontSizeSelect");
+const weekStartSelect = $("#weekStartSelect");
+const notificationsToggle = $("#notificationsToggle");
+const notificationTimingGroup = $("#notificationTimingGroup");
+const dailyAlertPeriodSelect = $("#dailyAlertPeriodSelect");
+const dailyAlertHourSelect = $("#dailyAlertHourSelect");
+const dailyAlertMinuteSelect = $("#dailyAlertMinuteSelect");
+const dailyAlertPeriodTrigger = $("#dailyAlertPeriodTrigger");
+const dailyAlertHourTrigger = $("#dailyAlertHourTrigger");
+const dailyAlertMinuteTrigger = $("#dailyAlertMinuteTrigger");
+const dailyAlertPeriodValue = $("#dailyAlertPeriodValue");
+const dailyAlertHourValue = $("#dailyAlertHourValue");
+const dailyAlertMinuteValue = $("#dailyAlertMinuteValue");
+const dailyAlertPeriodMenu = $("#dailyAlertPeriodMenu");
+const dailyAlertHourMenu = $("#dailyAlertHourMenu");
+const dailyAlertMinuteMenu = $("#dailyAlertMinuteMenu");
+const autoCleanupCompletedInput = $("#autoCleanupCompletedInput");
+const autoCleanupTrashedInput = $("#autoCleanupTrashedInput");
+const autoCleanupCompletedTrigger = $("#autoCleanupCompletedTrigger");
+const autoCleanupTrashedTrigger = $("#autoCleanupTrashedTrigger");
+const autoCleanupCompletedValue = $("#autoCleanupCompletedValue");
+const autoCleanupTrashedValue = $("#autoCleanupTrashedValue");
+const autoCleanupCompletedMenu = $("#autoCleanupCompletedMenu");
+const autoCleanupTrashedMenu = $("#autoCleanupTrashedMenu");
+const resetAllDataBtn = $("#resetAllDataBtn");
+const resetDataConfirmModal = $("#resetDataConfirmModal");
+const resetDataCancel = $("#resetDataCancel");
+const resetDataOk = $("#resetDataOk");
+const settingsGroupToggles = $$(".settings-group__toggle");
+
 const filters = $$(".filter-tabs__btn");
 
 /** 추가 시 사용할 날짜·반복 요일 (날짜 모달에서 설정) */
@@ -86,6 +150,49 @@ let expandedPanelsByTodo = {};
 /** 방금 추가된 할 일 ID (추가 애니메이션용) */
 let lastAddedTodoId = null;
 
+// ——— 시간 뷰 상태 ———
+let stopwatchState = {
+  running: false,
+  startTime: null,      // Date.now() 시작 시점
+  elapsedSeconds: 0     // 누적 경과 시간 (초)
+};
+
+let timerState = {
+  running: false,
+  targetSeconds: 0,     // 타이머 목표 시간 (초)
+  remainingSeconds: 0,  // 남은 시간
+  startTime: null       // Date.now() 시작 시점
+};
+
+let timerInterval = null;
+let stopwatchInterval = null;
+let openedTimerMenu = null;
+let openedSettingsMenu = null;
+let timeTrackingExpanded = false;
+const TIME_TRACKING_VISIBLE_COUNT = 5;
+const TODO_GROUP_LIMITS = { normal: 5, upcoming: 3, recurring: 3 };
+let todoGroupExpanded = { normal: false, upcoming: false, recurring: false };
+
+// ——— 설정 상태 ———
+const defaultSettings = {
+  fontSize: 'medium',
+  weekStartsOn: 0,
+  notifications: {
+    enabled: false,
+    beforeMinutes: []
+  },
+  autoCleanup: {
+    completedAfterDays: null,
+    trashedAfterDays: null
+  }
+};
+
+let settings = { ...defaultSettings };
+let notificationCheckInterval = null;
+
+// 시간 트래킹 인터벌 관리
+let timeTrackingIntervals = {}; // { todoId: intervalId }
+
 function setCalendarCompletedOpen(open) {
   calendarCompletedOpen = !!open;
   renderCalendar();
@@ -100,7 +207,7 @@ function updateDisclosureSection(contentEl, buttonEl, labelEl, isOpen, openText,
 
 // ——— 테마 ———
 function getStoredTheme() {
-  return localStorage.getItem(THEME_KEY) || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  return localStorage.getItem(THEME_KEY) || "dark";
 }
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
@@ -119,6 +226,7 @@ applyTheme(getStoredTheme());
 
 // ——— 동기부여 명언 (20개, 짧은 문장) ———
 const MOTIVATIONAL_QUOTES = [
+  "끝까지 가면 내가 다 이겨. -이상돌-",
   "Don't look back in anger.",
   "한 걸음씩이면 충분해.",
   "시작이 반이다.",
@@ -203,6 +311,41 @@ function showDeleteConfirmModal(message, onConfirm) {
   document.addEventListener("keydown", onEscape);
 }
 
+// ——— 완료 확인 모달 ———
+function showCompletionConfirmModal(todoId) {
+  if (!completionConfirmModal) return;
+  completionConfirmModal.hidden = false;
+  const close = () => {
+    completionConfirmModal.hidden = true;
+    completionConfirmNo?.removeEventListener("click", onNo);
+    completionConfirmYes?.removeEventListener("click", onYes);
+    completionConfirmModal.removeEventListener("click", onBackdrop);
+    document.removeEventListener("keydown", onEscape);
+  };
+  const onYes = () => {
+    const todo = todos.find(t => t.id === todoId);
+    if (todo) {
+      todo.completed = true;
+      todo.completedAt = new Date().toISOString();
+      saveTodos();
+      renderList();
+      renderTimeTracking();
+    }
+    close();
+  };
+  const onNo = () => close();
+  const onBackdrop = (e) => {
+    if (e.target === completionConfirmModal) close();
+  };
+  const onEscape = (e) => {
+    if (e.key === "Escape") close();
+  };
+  completionConfirmNo?.addEventListener("click", onNo);
+  completionConfirmYes?.addEventListener("click", onYes);
+  completionConfirmModal.addEventListener("click", onBackdrop);
+  document.addEventListener("keydown", onEscape);
+}
+
 function showCalendarCompleteModal(todo, targetDate, targetDatesAll = []) {
   if (!calendarCompleteModal || !todo || !targetDate) return;
   if (calendarCompleteTitle) calendarCompleteTitle.textContent = `<${todo.title}> 이 일을 다 마쳤나요?`;
@@ -277,6 +420,13 @@ function ensureTodoShape(todo) {
     title: st.title || "",
     completed: !!st.completed,
   }));
+  if (!todo.timeTracking) {
+    todo.timeTracking = {
+      totalSeconds: 0,
+      isRunning: false,
+      startTime: null
+    };
+  }
   return todo;
 }
 
@@ -335,6 +485,17 @@ function formatShortDateYYMMDD(dateStr) {
   const mm = dateStr.slice(5, 7);
   const dd = dateStr.slice(8, 10);
   return `${yy}.${mm}.${dd}`;
+}
+
+function formatTimeAMPM(isoString) {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const ampm = hours >= 12 ? '오후' : '오전';
+  const displayHours = hours % 12 || 12;
+  const displayMinutes = String(minutes).padStart(2, '0');
+  return `${ampm} ${displayHours}:${displayMinutes}`;
 }
 
 const HOLIDAY_CACHE = new Map();
@@ -723,7 +884,7 @@ function getCompletedScheduleEntries() {
       return;
     }
     if (t.completed) {
-      const doneDate = t.completedAt || end || start || toLocalDateStr(t.createdAt);
+      const doneDate = (t.completedAt ? toLocalDateStr(t.completedAt) : null) || end || start || toLocalDateStr(t.createdAt);
       if (doneDate) entries.push({ date: doneDate, todo: t, rangeText: formatShortDateYYMMDD(doneDate) });
     }
   });
@@ -881,6 +1042,7 @@ function renderCalendar() {
       const color = getScheduleBarColor(t);
       let row = "";
       let col = 0;
+      let hasActiveInWeek = false;
       while (col < 7) {
         const isActive = weekDates[col] >= start && (t.repeatDays || []).includes(col);
         if (!isActive) {
@@ -896,6 +1058,7 @@ function renderCalendar() {
         }
         const segStart = col;
         let segLen = 1;
+        hasActiveInWeek = true;
         while (segStart + segLen < 7) {
           const nextActive = weekDates[segStart + segLen] >= start && (t.repeatDays || []).includes(segStart + segLen);
           if (!nextActive) break;
@@ -904,7 +1067,9 @@ function renderCalendar() {
         row += buildCalendarBarSegments(t, weekDates, segStart, segLen, color, t.title, segStart, segLen);
         col = segStart + segLen;
       }
-      barRows.push(`<div class="calendar__bar-row">${row}</div>`);
+      if (hasActiveInWeek) {
+        barRows.push(`<div class="calendar__bar-row">${row}</div>`);
+      }
     });
 
     const weekStart = weekDates[0];
@@ -1107,7 +1272,7 @@ function renderList() {
     appEl.classList.toggle("view-settings", currentFilter === "settings");
   }
 
-  if (currentFilter === "time" || currentFilter === "settings") {
+  if (currentFilter === "time") {
     if (listSection) {
       listSection.hidden = true;
       listSection.setAttribute("hidden", "");
@@ -1116,6 +1281,36 @@ function renderList() {
       myView.hidden = true;
       myView.setAttribute("hidden", "");
     }
+    if (settingsView) {
+      settingsView.hidden = true;
+      settingsView.setAttribute("hidden", "");
+    }
+    if (timeView) {
+      timeView.hidden = false;
+      timeView.removeAttribute("hidden");
+    }
+    renderTimeTracking();
+    return;
+  }
+
+  if (currentFilter === "settings") {
+    if (listSection) {
+      listSection.hidden = true;
+      listSection.setAttribute("hidden", "");
+    }
+    if (myView) {
+      myView.hidden = true;
+      myView.setAttribute("hidden", "");
+    }
+    if (timeView) {
+      timeView.hidden = true;
+      timeView.setAttribute("hidden", "");
+    }
+    if (settingsView) {
+      settingsView.hidden = false;
+      settingsView.removeAttribute("hidden");
+    }
+    renderSettingsView();
     return;
   }
 
@@ -1127,6 +1322,14 @@ function renderList() {
     myView.hidden = true;
     myView.setAttribute("hidden", "");
   }
+  if (timeView) {
+    timeView.hidden = true;
+    timeView.setAttribute("hidden", "");
+  }
+  if (settingsView) {
+    settingsView.hidden = true;
+    settingsView.setAttribute("hidden", "");
+  }
 
   const filtered = getFilteredTodos();
   renderTagFilter();
@@ -1136,6 +1339,7 @@ function renderList() {
   const shouldGroupRecurring = currentFilter === "all" || currentFilter === "active";
   let displayTodos = filtered;
   const groupLabelByIndex = new Map();
+  const groupMoreByEndIndex = new Map();
 
   if (shouldGroupRecurring) {
     const today = todayDateStr();
@@ -1177,20 +1381,27 @@ function renderList() {
         recurringTodos = incompleteFirst(recurringTodos);
       }
     }
-    displayTodos = [...normalTodos, ...upcomingTodos, ...recurringTodos];
-
-    let idx = 0;
-    if (normalTodos.length > 0) {
-      groupLabelByIndex.set(idx, "일반 일정");
-      idx += normalTodos.length;
-    }
-    if (upcomingTodos.length > 0) {
-      groupLabelByIndex.set(idx, "다가오는 일정");
-      idx += upcomingTodos.length;
-    }
-    if (recurringTodos.length > 0) {
-      groupLabelByIndex.set(idx, "반복 일정");
-    }
+    displayTodos = [];
+    const pushGroup = (key, label, todosArr) => {
+      if (!todosArr || todosArr.length === 0) return;
+      const limit = TODO_GROUP_LIMITS[key] || todosArr.length;
+      const expanded = !!todoGroupExpanded[key];
+      const visibleTodos = (todosArr.length > limit && !expanded) ? todosArr.slice(0, limit) : todosArr;
+      const startIdx = displayTodos.length;
+      groupLabelByIndex.set(startIdx, label);
+      displayTodos.push(...visibleTodos);
+      const endIdx = displayTodos.length - 1;
+      if (todosArr.length > limit) {
+        groupMoreByEndIndex.set(endIdx, {
+          key,
+          expanded,
+          hiddenCount: Math.max(0, todosArr.length - visibleTodos.length),
+        });
+      }
+    };
+    pushGroup("normal", "일반 일정", normalTodos);
+    pushGroup("upcoming", "다가오는 일정", upcomingTodos);
+    pushGroup("recurring", "반복 일정", recurringTodos);
   }
 
   displayTodos.forEach((todo, idx) => {
@@ -1438,7 +1649,68 @@ function renderList() {
       tagAddInput.value = "";
     });
 
+    // 시간 트래킹 UI 렌더링
+    const timeTrackingWrap = node.querySelector(".todo-item__time-tracking");
+    if (timeTrackingWrap) {
+      // Todo 뷰(all)에서는 완전히 숨김
+      if (currentFilter === "all") {
+        timeTrackingWrap.remove();
+      } else {
+        const hasTime = todo.timeTracking &&
+                        (todo.timeTracking.totalSeconds > 0 || todo.timeTracking.isRunning);
+
+        if (hasTime) {
+          timeTrackingWrap.hidden = false;
+
+        const display = timeTrackingWrap.querySelector(".time-tracking__display");
+        const startBtn = timeTrackingWrap.querySelector(".todo-item__btn--time-start");
+        const resetBtn = timeTrackingWrap.querySelector(".todo-item__btn--time-reset");
+
+        const currentSeconds = todo.timeTracking.isRunning
+          ? todo.timeTracking.totalSeconds + Math.floor((Date.now() - todo.timeTracking.startTime) / 1000)
+          : todo.timeTracking.totalSeconds;
+
+        if (display) {
+          display.textContent = formatTimeDisplay(currentSeconds);
+          display.setAttribute("data-running", todo.timeTracking.isRunning ? "true" : "false");
+        }
+
+        if (startBtn) {
+          startBtn.textContent = todo.timeTracking.isRunning ? "정지" : "시작";
+          startBtn.setAttribute("data-running", todo.timeTracking.isRunning ? "true" : "false");
+          startBtn.onclick = () => toggleTimeTracking(todo.id);
+        }
+
+        if (resetBtn) {
+          resetBtn.onclick = () => {
+            showDeleteConfirmModal("측정한 시간을 리셋하시겠습니까?", () => {
+              resetTimeTracking(todo.id);
+            });
+          };
+        }
+        } else {
+          timeTrackingWrap.hidden = true;
+        }
+      }
+    }
+
     list.appendChild(node);
+
+    if (shouldGroupRecurring && groupMoreByEndIndex.has(idx)) {
+      const moreInfo = groupMoreByEndIndex.get(idx);
+      const moreLi = document.createElement("li");
+      moreLi.className = "todo-list__more-wrap";
+      const moreBtn = document.createElement("button");
+      moreBtn.type = "button";
+      moreBtn.className = "todo-list__more-btn";
+      moreBtn.textContent = moreInfo.expanded ? "접기" : `더보기 (${moreInfo.hiddenCount}개)`;
+      moreBtn.addEventListener("click", () => {
+        todoGroupExpanded[moreInfo.key] = !todoGroupExpanded[moreInfo.key];
+        renderList();
+      });
+      moreLi.appendChild(moreBtn);
+      list.appendChild(moreLi);
+    }
   });
 
   listEmpty.hidden = filtered.length > 0;
@@ -1906,12 +2178,1028 @@ if (calendarGrid) {
   });
 }
 
+// ================================================
+// 시간 뷰 (Time View)
+// ================================================
+
+// ——— 시간 포맷팅 유틸리티 ———
+function formatTimeDisplay(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function setTimerPickerValue(selectEl, valueEl, value) {
+  if (!selectEl) return;
+  const normalized = String(Math.max(0, Number(value) || 0));
+  selectEl.value = normalized;
+  if (valueEl) valueEl.textContent = String(normalized).padStart(2, "0");
+}
+
+function closeTimerPickerMenu(menuEl, triggerEl) {
+  if (!menuEl || !triggerEl) return;
+  menuEl.hidden = true;
+  triggerEl.setAttribute("aria-expanded", "false");
+  const picker = triggerEl.closest(".timer-picker");
+  if (picker) picker.classList.remove("is-open");
+  if (openedTimerMenu === menuEl) openedTimerMenu = null;
+}
+
+function openTimerPickerMenu(menuEl, triggerEl) {
+  if (!menuEl || !triggerEl) return;
+  if (openedTimerMenu && openedTimerMenu !== menuEl) {
+    const prevTrigger = openedTimerMenu.parentElement?.querySelector(".timer-picker__trigger");
+    closeTimerPickerMenu(openedTimerMenu, prevTrigger);
+  }
+  menuEl.hidden = false;
+  triggerEl.setAttribute("aria-expanded", "true");
+  const picker = triggerEl.closest(".timer-picker");
+  if (picker) picker.classList.add("is-open");
+  menuEl.querySelector(".timer-picker__option.is-selected")?.scrollIntoView({ block: "nearest" });
+  openedTimerMenu = menuEl;
+}
+
+function populateTimerPicker(selectEl, valueEl, menuEl, triggerEl, max) {
+  if (!selectEl || !menuEl || !triggerEl) return;
+  selectEl.innerHTML = "";
+  menuEl.innerHTML = "";
+  const fragment = document.createDocumentFragment();
+  for (let i = 0; i <= max; i++) {
+    const opt = document.createElement("option");
+    opt.value = String(i);
+    opt.textContent = String(i).padStart(2, "0");
+    selectEl.appendChild(opt);
+
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "timer-picker__option";
+    item.textContent = String(i).padStart(2, "0");
+    item.setAttribute("role", "option");
+    item.setAttribute("data-value", String(i));
+    item.addEventListener("click", () => {
+      setTimerPickerValue(selectEl, valueEl, i);
+      menuEl.querySelectorAll(".timer-picker__option").forEach((el) => {
+        el.classList.toggle("is-selected", el.getAttribute("data-value") === String(i));
+      });
+      closeTimerPickerMenu(menuEl, triggerEl);
+    });
+    fragment.appendChild(item);
+  }
+  menuEl.appendChild(fragment);
+  setTimerPickerValue(selectEl, valueEl, 0);
+  menuEl.querySelector('[data-value="0"]')?.classList.add("is-selected");
+
+  triggerEl.addEventListener("click", () => {
+    if (menuEl.hidden) openTimerPickerMenu(menuEl, triggerEl);
+    else closeTimerPickerMenu(menuEl, triggerEl);
+  });
+}
+
+function initializeTimerSelects() {
+  populateTimerPicker(timerHoursInput, timerHoursValue, timerHoursMenu, timerHoursTrigger, 23);
+  populateTimerPicker(timerMinutesInput, timerMinutesValue, timerMinutesMenu, timerMinutesTrigger, 59);
+  populateTimerPicker(timerSecondsInput, timerSecondsValue, timerSecondsMenu, timerSecondsTrigger, 59);
+
+  document.addEventListener("click", (e) => {
+    if (!openedTimerMenu) return;
+    const openedPicker = openedTimerMenu.closest(".timer-picker");
+    if (openedPicker && !openedPicker.contains(e.target)) {
+      const trigger = openedPicker.querySelector(".timer-picker__trigger");
+      closeTimerPickerMenu(openedTimerMenu, trigger);
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !openedTimerMenu) return;
+    const openedPicker = openedTimerMenu.closest(".timer-picker");
+    const trigger = openedPicker?.querySelector(".timer-picker__trigger");
+    closeTimerPickerMenu(openedTimerMenu, trigger);
+  });
+}
+
+// ——— 스톱워치 ———
+function startStopwatch() {
+  if (stopwatchState.running) {
+    // 정지
+    stopwatchState.running = false;
+    stopwatchState.elapsedSeconds += Math.floor((Date.now() - stopwatchState.startTime) / 1000);
+    stopwatchState.startTime = null;
+    clearInterval(stopwatchInterval);
+    if (stopwatchStartBtn) stopwatchStartBtn.textContent = "시작";
+  } else {
+    // 시작
+    stopwatchState.running = true;
+    stopwatchState.startTime = Date.now();
+    if (stopwatchStartBtn) stopwatchStartBtn.textContent = "정지";
+
+    stopwatchInterval = setInterval(() => {
+      const currentElapsed = stopwatchState.elapsedSeconds + Math.floor((Date.now() - stopwatchState.startTime) / 1000);
+      if (stopwatchDisplay) stopwatchDisplay.textContent = formatTimeDisplay(currentElapsed);
+    }, 100);
+  }
+}
+
+function resetStopwatch() {
+  stopwatchState.running = false;
+  stopwatchState.startTime = null;
+  stopwatchState.elapsedSeconds = 0;
+  clearInterval(stopwatchInterval);
+  if (stopwatchDisplay) stopwatchDisplay.textContent = "00:00:00";
+  if (stopwatchStartBtn) stopwatchStartBtn.textContent = "시작";
+}
+
+// ——— 타이머 ———
+function getTimerInputSeconds() {
+  const h = parseInt(timerHoursInput?.value || 0);
+  const m = parseInt(timerMinutesInput?.value || 0);
+  const s = parseInt(timerSecondsInput?.value || 0);
+  return h * 3600 + m * 60 + s;
+}
+
+function startTimer() {
+  if (timerState.running) {
+    // 정지
+    timerState.running = false;
+    const elapsed = Math.floor((Date.now() - timerState.startTime) / 1000);
+    timerState.remainingSeconds = Math.max(0, timerState.remainingSeconds - elapsed);
+    clearInterval(timerInterval);
+    if (timerStartBtn) timerStartBtn.textContent = "시작";
+  } else {
+    // 시작
+    if (timerState.remainingSeconds === 0) {
+      timerState.targetSeconds = getTimerInputSeconds();
+      timerState.remainingSeconds = timerState.targetSeconds;
+      if (timerState.targetSeconds === 0) {
+        showTimerConfigModal();
+        return;
+      }
+    }
+
+    timerState.running = true;
+    timerState.startTime = Date.now();
+    if (timerStartBtn) timerStartBtn.textContent = "정지";
+
+    timerInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - timerState.startTime) / 1000);
+      const remaining = Math.max(0, timerState.remainingSeconds - elapsed);
+      if (timerDisplay) timerDisplay.textContent = formatTimeDisplay(remaining);
+
+      if (remaining === 0) {
+        clearInterval(timerInterval);
+        timerState.running = false;
+        timerState.remainingSeconds = 0;
+        if (timerStartBtn) timerStartBtn.textContent = "시작";
+        showTimerCompleteModal();
+      }
+    }, 100);
+  }
+}
+
+function resetTimer() {
+  timerState.running = false;
+  timerState.targetSeconds = 0;
+  timerState.remainingSeconds = 0;
+  timerState.startTime = null;
+  clearInterval(timerInterval);
+  if (timerDisplay) timerDisplay.textContent = "00:00:00";
+  if (timerStartBtn) timerStartBtn.textContent = "시작";
+  setTimerPickerValue(timerHoursInput, timerHoursValue, 0);
+  setTimerPickerValue(timerMinutesInput, timerMinutesValue, 0);
+  setTimerPickerValue(timerSecondsInput, timerSecondsValue, 0);
+  [timerHoursMenu, timerMinutesMenu, timerSecondsMenu].forEach((menu) => {
+    menu?.querySelectorAll(".timer-picker__option").forEach((el) => {
+      el.classList.toggle("is-selected", el.getAttribute("data-value") === "0");
+    });
+  });
+}
+
+function showTimerCompleteModal() {
+  if (!timerCompleteModal) return;
+  timerCompleteModal.hidden = false;
+
+  // 브라우저 알림도 표시 (권한이 있으면)
+  sendWebNotification("ReBorn 타이머 완료", "설정한 시간이 모두 지났습니다.");
+
+  const close = () => {
+    timerCompleteModal.hidden = true;
+    timerCompleteOk?.removeEventListener("click", close);
+  };
+  timerCompleteOk?.addEventListener("click", close);
+}
+
+function sendWebNotification(title, body) {
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return false;
+  try {
+    new Notification(title, { body });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function showTimerConfigModal() {
+  if (!timerConfigModal) return;
+  timerConfigModal.hidden = false;
+
+  const close = () => {
+    timerConfigModal.hidden = true;
+    timerConfigOk?.removeEventListener("click", onOk);
+    timerConfigModal.removeEventListener("click", onBackdrop);
+    document.removeEventListener("keydown", onEscape);
+  };
+  const onOk = () => close();
+  const onBackdrop = (e) => {
+    if (e.target === timerConfigModal) close();
+  };
+  const onEscape = (e) => {
+    if (e.key === "Escape") close();
+  };
+  timerConfigOk?.addEventListener("click", onOk);
+  timerConfigModal.addEventListener("click", onBackdrop);
+  document.addEventListener("keydown", onEscape);
+}
+
+// ================================================
+// 시간 트래킹 로직
+// ================================================
+
+/**
+ * 시간 측정 시작/정지 토글
+ */
+function toggleTimeTracking(todoId) {
+  const todo = todos.find(t => t.id === todoId);
+  if (!todo) return;
+
+  if (!todo.timeTracking) {
+    todo.timeTracking = { totalSeconds: 0, isRunning: false, startTime: null };
+  }
+
+  if (todo.timeTracking.isRunning) {
+    stopTimeTracking(todoId);
+  } else {
+    // 한 번에 하나만 실행 정책
+    stopAllTimeTracking();
+    startTimeTracking(todoId);
+  }
+}
+
+function startTimeTracking(todoId) {
+  const todo = todos.find(t => t.id === todoId);
+  if (!todo || !todo.timeTracking) return;
+
+  todo.timeTracking.isRunning = true;
+  todo.timeTracking.startTime = Date.now();
+  saveTodos();
+
+  // UI 업데이트 인터벌 (100ms마다)
+  timeTrackingIntervals[todoId] = setInterval(() => {
+    updateTimeTrackingDisplay(todoId);
+  }, 100);
+
+  renderList();
+}
+
+function stopTimeTracking(todoId) {
+  const todo = todos.find(t => t.id === todoId);
+  if (!todo || !todo.timeTracking || !todo.timeTracking.isRunning) return;
+
+  const elapsed = Math.floor((Date.now() - todo.timeTracking.startTime) / 1000);
+  todo.timeTracking.totalSeconds += elapsed;
+  todo.timeTracking.isRunning = false;
+  todo.timeTracking.startTime = null;
+  saveTodos();
+
+  // 인터벌 정리
+  if (timeTrackingIntervals[todoId]) {
+    clearInterval(timeTrackingIntervals[todoId]);
+    delete timeTrackingIntervals[todoId];
+  }
+
+  // 완료 확인 모달 표시
+  showCompletionConfirmModal(todoId);
+
+  renderList();
+  renderTimeTracking();
+}
+
+function stopAllTimeTracking() {
+  todos.forEach(t => {
+    if (t.timeTracking?.isRunning) {
+      stopTimeTracking(t.id);
+    }
+  });
+}
+
+function resetTimeTracking(todoId) {
+  const todo = todos.find(t => t.id === todoId);
+  if (!todo || !todo.timeTracking) return;
+
+  if (todo.timeTracking.isRunning) {
+    stopTimeTracking(todoId);
+  }
+
+  todo.timeTracking.totalSeconds = 0;
+  saveTodos();
+  renderList();
+  renderTimeTracking();
+}
+
+/**
+ * 시간 표시 업데이트 (측정 중인 항목)
+ */
+function updateTimeTrackingDisplay(todoId) {
+  const todo = todos.find(t => t.id === todoId);
+  if (!todo || !todo.timeTracking?.isRunning) return;
+
+  const elapsed = Math.floor((Date.now() - todo.timeTracking.startTime) / 1000);
+  const totalSeconds = todo.timeTracking.totalSeconds + elapsed;
+
+  const display = document.querySelector(`[data-id="${todoId}"] .time-tracking__display`);
+  if (display) {
+    display.textContent = formatTimeDisplay(totalSeconds);
+  }
+}
+
+/**
+ * 브라우저 재시작 시 측정 중이던 항목 복구
+ */
+function restoreTimeTrackingState() {
+  todos.forEach(todo => {
+    if (todo.timeTracking?.isRunning) {
+      const elapsed = Math.floor((Date.now() - todo.timeTracking.startTime) / 1000);
+      todo.timeTracking.totalSeconds += elapsed;
+      todo.timeTracking.isRunning = false;
+      todo.timeTracking.startTime = null;
+    }
+  });
+  saveTodos();
+}
+
+// ——— 할일별 시간 트래킹 렌더 ———
+function renderTimeTracking() {
+  if (!timeTrackingList) return;
+
+  // 삭제되지 않고 완료되지 않은 할일만 표시
+  const activeTodos = todos.filter(t => !t.deletedAt && !t.completed);
+  const hasOverflow = activeTodos.length > TIME_TRACKING_VISIBLE_COUNT;
+  if (!hasOverflow) timeTrackingExpanded = false;
+  const visibleTodos = (hasOverflow && !timeTrackingExpanded)
+    ? activeTodos.slice(0, TIME_TRACKING_VISIBLE_COUNT)
+    : activeTodos;
+
+  if (activeTodos.length === 0) {
+    timeTrackingList.innerHTML = '<li class="time-tracking-empty">할 일이 없습니다.</li>';
+    if (timeTrackingMoreBtn) timeTrackingMoreBtn.hidden = true;
+    return;
+  }
+
+  timeTrackingList.innerHTML = '';
+
+  visibleTodos.forEach(todo => {
+    const li = document.createElement('li');
+    li.className = 'time-tracking-item';
+    li.setAttribute('data-id', todo.id);
+
+    const title = document.createElement('span');
+    title.className = 'time-tracking-item__title';
+    title.textContent = todo.title;
+
+    const controls = document.createElement('div');
+    controls.className = 'time-tracking-item__controls';
+
+    const timeDisplay = document.createElement('span');
+    timeDisplay.className = 'time-tracking-item__duration';
+
+    const currentSeconds = todo.timeTracking?.isRunning
+      ? todo.timeTracking.totalSeconds + Math.floor((Date.now() - todo.timeTracking.startTime) / 1000)
+      : (todo.timeTracking?.totalSeconds || 0);
+
+    timeDisplay.textContent = formatTimeDisplay(currentSeconds);
+    timeDisplay.setAttribute('data-running', todo.timeTracking?.isRunning ? 'true' : 'false');
+
+    const startBtn = document.createElement('button');
+    startBtn.className = 'time-tracking-item__btn time-tracking-item__btn--start';
+    startBtn.textContent = todo.timeTracking?.isRunning ? '정지' : '시작';
+    startBtn.setAttribute('data-running', todo.timeTracking?.isRunning ? 'true' : 'false');
+    startBtn.onclick = () => {
+      toggleTimeTracking(todo.id);
+      renderTimeTracking();
+    };
+
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'time-tracking-item__btn time-tracking-item__btn--reset';
+    resetBtn.textContent = '리셋';
+    resetBtn.disabled = !todo.timeTracking || todo.timeTracking.totalSeconds === 0;
+    resetBtn.onclick = () => {
+      showDeleteConfirmModal('측정한 시간을 리셋하시겠습니까?', () => {
+        resetTimeTracking(todo.id);
+      });
+    };
+
+    controls.appendChild(timeDisplay);
+    controls.appendChild(startBtn);
+    controls.appendChild(resetBtn);
+
+    li.appendChild(title);
+    li.appendChild(controls);
+
+    timeTrackingList.appendChild(li);
+  });
+
+  if (timeTrackingMoreBtn) {
+    timeTrackingMoreBtn.hidden = !hasOverflow;
+    timeTrackingMoreBtn.textContent = timeTrackingExpanded
+      ? "접기"
+      : `더보기 (${activeTodos.length - TIME_TRACKING_VISIBLE_COUNT}개)`;
+  }
+
+  // 측정 중인 항목의 실시간 업데이트
+  const visibleIds = new Set(visibleTodos.map((t) => t.id));
+  Object.keys(timeTrackingIntervals).forEach((key) => {
+    if (!key.startsWith("render-")) return;
+    const todoId = key.slice("render-".length);
+    if (!visibleIds.has(todoId)) {
+      clearInterval(timeTrackingIntervals[key]);
+      delete timeTrackingIntervals[key];
+    }
+  });
+
+  visibleTodos.forEach(todo => {
+    if (todo.timeTracking?.isRunning) {
+      if (!timeTrackingIntervals[`render-${todo.id}`]) {
+        timeTrackingIntervals[`render-${todo.id}`] = setInterval(() => {
+          const display = timeTrackingList.querySelector(`[data-id="${todo.id}"] .time-tracking-item__duration`);
+          if (display && todo.timeTracking?.isRunning) {
+            const currentSeconds = todo.timeTracking.totalSeconds + Math.floor((Date.now() - todo.timeTracking.startTime) / 1000);
+            display.textContent = formatTimeDisplay(currentSeconds);
+          }
+        }, 100);
+      }
+    } else {
+      // 인터벌 정리
+      if (timeTrackingIntervals[`render-${todo.id}`]) {
+        clearInterval(timeTrackingIntervals[`render-${todo.id}`]);
+        delete timeTrackingIntervals[`render-${todo.id}`];
+      }
+    }
+  });
+}
+
+// ================================================
+// 설정 뷰 (Settings View)
+// ================================================
+
+// ——— 설정 로드/저장 ———
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      settings = { ...defaultSettings, ...parsed };
+      // 중첩 객체 병합
+      if (parsed.notifications) {
+        settings.notifications = { ...defaultSettings.notifications, ...parsed.notifications };
+      }
+      if (parsed.autoCleanup) {
+        settings.autoCleanup = { ...defaultSettings.autoCleanup, ...parsed.autoCleanup };
+      }
+    }
+  } catch (_) {
+    settings = { ...defaultSettings };
+  }
+
+  // 기존 beforeMinutes를 advanceDays로 마이그레이션
+  if (settings.notifications.beforeMinutes && !settings.notifications.advanceDays) {
+    // 5/15/30분 → 당일(0), 60분 → 1일 전
+    const hasShortTerm = settings.notifications.beforeMinutes.some(m => m < 60);
+    const hasLongTerm = settings.notifications.beforeMinutes.includes(60);
+
+    settings.notifications.advanceDays = [];
+    if (hasShortTerm) settings.notifications.advanceDays.push(0);
+    if (hasLongTerm) settings.notifications.advanceDays.push(1);
+
+    delete settings.notifications.beforeMinutes;
+    saveSettings();
+  }
+
+  // 기본값 설정
+  if (!settings.notifications.dailyAlertTime) {
+    settings.notifications.dailyAlertTime = "09:00";
+  }
+  if (!settings.notifications.advanceDays) {
+    settings.notifications.advanceDays = [];
+  }
+
+  applySettings();
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch (_) {}
+}
+
+function applySettings() {
+  // 폰트 크기
+  if (document.documentElement) {
+    document.documentElement.setAttribute('data-font-size', settings.fontSize);
+  }
+
+  // 캘린더 주 시작 (기존 캘린더 렌더 함수 수정 필요)
+  if (currentFilter === 'my') renderCalendar();
+}
+
+// ——— 설정 뷰 렌더 ———
+function renderSettingsView() {
+  if (!settingsView) return;
+  collapseAllSettingsGroups();
+
+  // 폰트 크기
+  if (fontSizeSelect) fontSizeSelect.value = settings.fontSize;
+
+  // 주 시작
+  if (weekStartSelect) weekStartSelect.value = String(settings.weekStartsOn);
+
+  // 알림
+  if (notificationsToggle) {
+    notificationsToggle.checked = settings.notifications.enabled;
+  }
+  if (notificationTimingGroup) {
+    notificationTimingGroup.hidden = !settings.notifications.enabled;
+  }
+
+  // 일일 알림 시각
+  setDailyAlertPickerFromTime(settings.notifications.dailyAlertTime || "09:00");
+
+  // 알림 타이밍 체크박스
+  $$(".advance-days-cb").forEach(cb => {
+    cb.checked = settings.notifications.advanceDays?.includes(Number(cb.value)) || false;
+  });
+
+  // 자동 정리
+  if (autoCleanupCompletedInput) {
+    setSettingsPickerValue(autoCleanupCompletedInput, autoCleanupCompletedValue, settings.autoCleanup.completedAfterDays || 0, (v) => String(v));
+    autoCleanupCompletedMenu?.querySelectorAll(".settings-time-picker__option").forEach((el) => {
+      el.classList.toggle("is-selected", el.getAttribute("data-value") === String(autoCleanupCompletedInput.value));
+    });
+  }
+  if (autoCleanupTrashedInput) {
+    setSettingsPickerValue(autoCleanupTrashedInput, autoCleanupTrashedValue, settings.autoCleanup.trashedAfterDays || 0, (v) => String(v));
+    autoCleanupTrashedMenu?.querySelectorAll(".settings-time-picker__option").forEach((el) => {
+      el.classList.toggle("is-selected", el.getAttribute("data-value") === String(autoCleanupTrashedInput.value));
+    });
+  }
+}
+
+function setSettingsGroupOpen(toggleEl, contentEl, open) {
+  if (!toggleEl || !contentEl) return;
+  contentEl.hidden = false;
+  contentEl.setAttribute("aria-hidden", open ? "false" : "true");
+  toggleEl.setAttribute("aria-expanded", open ? "true" : "false");
+  toggleEl.classList.toggle("is-open", !!open);
+  contentEl.classList.toggle("is-open", !!open);
+}
+
+function collapseAllSettingsGroups() {
+  settingsGroupToggles.forEach((toggleEl) => {
+    const targetId = toggleEl.getAttribute("data-target");
+    const contentEl = targetId ? document.getElementById(targetId) : null;
+    setSettingsGroupOpen(toggleEl, contentEl, false);
+  });
+}
+
+function initializeSettingsAccordions() {
+  settingsGroupToggles.forEach((toggleEl) => {
+    const targetId = toggleEl.getAttribute("data-target");
+    const contentEl = targetId ? document.getElementById(targetId) : null;
+    if (!contentEl) return;
+    setSettingsGroupOpen(toggleEl, contentEl, false);
+    toggleEl.addEventListener("click", () => {
+      const next = toggleEl.getAttribute("aria-expanded") !== "true";
+      setSettingsGroupOpen(toggleEl, contentEl, next);
+    });
+  });
+}
+
+// ——— 설정 변경 이벤트 핸들러 ———
+function onFontSizeChange(e) {
+  settings.fontSize = e.target.value;
+  saveSettings();
+  applySettings();
+}
+
+function onWeekStartChange(e) {
+  settings.weekStartsOn = Number(e.target.value);
+  saveSettings();
+  applySettings();
+}
+
+function onNotificationsToggle(e) {
+  const enabled = e.target.checked;
+
+  if (enabled && typeof Notification !== 'undefined' && Notification.permission === "default") {
+    Notification.requestPermission().then(permission => {
+      if (permission === "granted") {
+        settings.notifications.enabled = true;
+        if (notificationTimingGroup) notificationTimingGroup.hidden = false;
+      } else {
+        e.target.checked = false;
+        alert("알림 권한이 거부되었습니다.");
+      }
+      saveSettings();
+      scheduleNotifications();
+    });
+  } else if (enabled && typeof Notification !== 'undefined' && Notification.permission === "denied") {
+    e.target.checked = false;
+    alert("브라우저 설정에서 알림 권한을 허용해주세요.");
+  } else {
+    settings.notifications.enabled = enabled;
+    if (notificationTimingGroup) notificationTimingGroup.hidden = !enabled;
+    saveSettings();
+    scheduleNotifications();
+  }
+}
+
+function onNotificationTimingChange() {
+  settings.notifications.advanceDays = Array.from($$(".advance-days-cb"))
+    .filter(cb => cb.checked)
+    .map(cb => Number(cb.value));
+  saveSettings();
+}
+
+function onDailyAlertTimeChange() {
+  settings.notifications.dailyAlertTime = getDailyAlertTimeFromPicker();
+  saveSettings();
+}
+
+function onAutoCleanupCompletedChange(e) {
+  const val = Number(e.target.value);
+  settings.autoCleanup.completedAfterDays = val > 0 ? val : null;
+  saveSettings();
+}
+
+function onAutoCleanupTrashedChange(e) {
+  const val = Number(e.target.value);
+  settings.autoCleanup.trashedAfterDays = val > 0 ? val : null;
+  saveSettings();
+}
+
+function populateSelectRange(selectEl, min, max, pad = false) {
+  if (!selectEl) return;
+  if (selectEl.options.length > 0) return;
+  for (let i = min; i <= max; i++) {
+    const opt = document.createElement("option");
+    opt.value = String(i);
+    opt.textContent = pad ? String(i).padStart(2, "0") : String(i);
+    selectEl.appendChild(opt);
+  }
+}
+
+function setSettingsPickerValue(selectEl, valueEl, value, formatter = (v) => String(v), emitChange = false) {
+  if (!selectEl) return;
+  selectEl.value = String(value);
+  if (valueEl) valueEl.textContent = formatter(String(value));
+  if (emitChange) selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function closeSettingsPickerMenu(menuEl, triggerEl) {
+  if (!menuEl || !triggerEl) return;
+  menuEl.hidden = true;
+  triggerEl.setAttribute("aria-expanded", "false");
+  const picker = triggerEl.closest(".settings-time-picker");
+  if (picker) picker.classList.remove("is-open");
+  if (openedSettingsMenu === menuEl) openedSettingsMenu = null;
+}
+
+function openSettingsPickerMenu(menuEl, triggerEl) {
+  if (!menuEl || !triggerEl) return;
+  if (openedSettingsMenu && openedSettingsMenu !== menuEl) {
+    const prevTrigger = openedSettingsMenu.parentElement?.querySelector(".settings-time-picker__trigger");
+    closeSettingsPickerMenu(openedSettingsMenu, prevTrigger);
+  }
+  menuEl.hidden = false;
+  triggerEl.setAttribute("aria-expanded", "true");
+  const picker = triggerEl.closest(".settings-time-picker");
+  if (picker) picker.classList.add("is-open");
+  menuEl.querySelector(".settings-time-picker__option.is-selected")?.scrollIntoView({ block: "nearest" });
+  openedSettingsMenu = menuEl;
+}
+
+function populateSettingsPicker(selectEl, valueEl, menuEl, triggerEl, formatter = (v) => String(v)) {
+  if (!selectEl || !menuEl || !triggerEl) return;
+  menuEl.innerHTML = "";
+  const fragment = document.createDocumentFragment();
+  Array.from(selectEl.options).forEach((opt) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "settings-time-picker__option";
+    item.textContent = formatter(opt.value);
+    item.setAttribute("role", "option");
+    item.setAttribute("data-value", opt.value);
+    item.addEventListener("click", () => {
+      setSettingsPickerValue(selectEl, valueEl, opt.value, formatter, true);
+      menuEl.querySelectorAll(".settings-time-picker__option").forEach((el) => {
+        el.classList.toggle("is-selected", el.getAttribute("data-value") === opt.value);
+      });
+      closeSettingsPickerMenu(menuEl, triggerEl);
+    });
+    fragment.appendChild(item);
+  });
+  menuEl.appendChild(fragment);
+
+  triggerEl.addEventListener("click", () => {
+    if (menuEl.hidden) openSettingsPickerMenu(menuEl, triggerEl);
+    else closeSettingsPickerMenu(menuEl, triggerEl);
+  });
+}
+
+function initializeSettingsPickerSelects() {
+  populateSelectRange(dailyAlertHourSelect, 1, 12, true);
+  populateSelectRange(dailyAlertMinuteSelect, 0, 59, true);
+  populateSelectRange(autoCleanupCompletedInput, 0, 30, false);
+  populateSelectRange(autoCleanupTrashedInput, 0, 30, false);
+}
+
+function initializeSettingsCustomPickers() {
+  populateSettingsPicker(dailyAlertPeriodSelect, dailyAlertPeriodValue, dailyAlertPeriodMenu, dailyAlertPeriodTrigger, (v) => (v === "AM" ? "오전" : "오후"));
+  populateSettingsPicker(dailyAlertHourSelect, dailyAlertHourValue, dailyAlertHourMenu, dailyAlertHourTrigger, (v) => String(v).padStart(2, "0"));
+  populateSettingsPicker(dailyAlertMinuteSelect, dailyAlertMinuteValue, dailyAlertMinuteMenu, dailyAlertMinuteTrigger, (v) => String(v).padStart(2, "0"));
+  populateSettingsPicker(autoCleanupCompletedInput, autoCleanupCompletedValue, autoCleanupCompletedMenu, autoCleanupCompletedTrigger, (v) => String(v));
+  populateSettingsPicker(autoCleanupTrashedInput, autoCleanupTrashedValue, autoCleanupTrashedMenu, autoCleanupTrashedTrigger, (v) => String(v));
+
+  document.addEventListener("click", (e) => {
+    if (!openedSettingsMenu) return;
+    const openedPicker = openedSettingsMenu.closest(".settings-time-picker");
+    if (openedPicker && !openedPicker.contains(e.target)) {
+      const trigger = openedPicker.querySelector(".settings-time-picker__trigger");
+      closeSettingsPickerMenu(openedSettingsMenu, trigger);
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !openedSettingsMenu) return;
+    const openedPicker = openedSettingsMenu.closest(".settings-time-picker");
+    const trigger = openedPicker?.querySelector(".settings-time-picker__trigger");
+    closeSettingsPickerMenu(openedSettingsMenu, trigger);
+  });
+}
+
+function setDailyAlertPickerFromTime(timeStr) {
+  if (!dailyAlertPeriodSelect || !dailyAlertHourSelect || !dailyAlertMinuteSelect) return;
+  const [hRaw, mRaw] = String(timeStr || "09:00").split(":").map(Number);
+  const hour24 = Number.isFinite(hRaw) ? hRaw : 9;
+  const minute = Number.isFinite(mRaw) ? mRaw : 0;
+  const isPm = hour24 >= 12;
+  const hour12 = (hour24 % 12) || 12;
+  setSettingsPickerValue(dailyAlertPeriodSelect, dailyAlertPeriodValue, isPm ? "PM" : "AM", (v) => (v === "AM" ? "오전" : "오후"));
+  setSettingsPickerValue(dailyAlertHourSelect, dailyAlertHourValue, String(hour12), (v) => String(v).padStart(2, "0"));
+  setSettingsPickerValue(dailyAlertMinuteSelect, dailyAlertMinuteValue, String(Math.max(0, Math.min(59, minute))), (v) => String(v).padStart(2, "0"));
+  [dailyAlertPeriodMenu, dailyAlertHourMenu, dailyAlertMinuteMenu].forEach((menu) => {
+    menu?.querySelectorAll(".settings-time-picker__option").forEach((el) => {
+      const selectId = menu.id === "dailyAlertPeriodMenu" ? dailyAlertPeriodSelect.value
+        : menu.id === "dailyAlertHourMenu" ? dailyAlertHourSelect.value
+          : dailyAlertMinuteSelect.value;
+      el.classList.toggle("is-selected", el.getAttribute("data-value") === selectId);
+    });
+  });
+}
+
+function getDailyAlertTimeFromPicker() {
+  const period = dailyAlertPeriodSelect?.value || "AM";
+  const hour12 = Number(dailyAlertHourSelect?.value || 9);
+  const minute = Number(dailyAlertMinuteSelect?.value || 0);
+  let hour24 = hour12 % 12;
+  if (period === "PM") hour24 += 12;
+  return `${String(hour24).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function resetAllData() {
+  if (!resetDataConfirmModal) return;
+
+  resetDataConfirmModal.hidden = false;
+
+  const close = () => {
+    resetDataConfirmModal.hidden = true;
+    resetDataCancel?.removeEventListener("click", onCancel);
+    resetDataOk?.removeEventListener("click", onOk);
+  };
+
+  const onOk = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(TRASH_STORAGE_KEY);
+    localStorage.removeItem(SETTINGS_STORAGE_KEY);
+    localStorage.removeItem(THEME_KEY);
+    close();
+    location.reload();
+  };
+
+  const onCancel = () => close();
+
+  resetDataCancel?.addEventListener("click", onCancel);
+  resetDataOk?.addEventListener("click", onOk);
+}
+
+// ================================================
+// 알림 및 자동화
+// ================================================
+
+// ——— 알림 스케줄러 ———
+function scheduleNotifications() {
+  // 기존 인터벌 클리어
+  if (notificationCheckInterval) {
+    clearInterval(notificationCheckInterval);
+  }
+
+  if (!settings.notifications.enabled || typeof Notification === 'undefined' || Notification.permission !== "granted") {
+    return;
+  }
+
+  // 1분마다 체크
+  notificationCheckInterval = setInterval(checkUpcomingTodos, 60000);
+  checkUpcomingTodos(); // 즉시 한 번 실행
+}
+
+// ——— 알림 헬퍼 함수 ———
+
+// 시간 매칭 헬퍼 (±2분 허용)
+function isTimeMatch(current, target, toleranceMinutes = 2) {
+  const [ch, cm] = current.split(':').map(Number);
+  const [th, tm] = target.split(':').map(Number);
+  const currentMinutes = ch * 60 + cm;
+  const targetMinutes = th * 60 + tm;
+  return Math.abs(currentMinutes - targetMinutes) <= toleranceMinutes;
+}
+
+// 특정 날짜에 시작하는 할일 가져오기
+function getTodosStartingOnDate(dateStr) {
+  const dow = new Date(`${dateStr}T00:00:00`).getDay();
+  return todos.filter(t => {
+    if (t.completed || isFutureSnoozed(t)) return false;
+    const { start } = getEffectiveDateRange(t);
+    if (!start) return false;
+
+    // 반복 일정
+    if (t.repeatDays?.length > 0) {
+      return start <= dateStr && t.repeatDays.includes(dow);
+    }
+
+    // 단일/기간 일정: 시작일 기준 알림
+    return start === dateStr;
+  });
+}
+
+function checkUpcomingTodos() {
+  if (!settings.notifications.enabled ||
+      !settings.notifications.advanceDays ||
+      settings.notifications.advanceDays.length === 0) {
+    return;
+  }
+
+  const now = new Date();
+  const today = todayDateStr();
+  const alertTime = settings.notifications.dailyAlertTime || "09:00";
+  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const [ch, cm] = currentTime.split(':').map(Number);
+  const [th, tm] = alertTime.split(':').map(Number);
+  const currentMinutes = ch * 60 + cm;
+  const targetMinutes = th * 60 + tm;
+
+  // 설정 시각 이전이면 체크하지 않음 (이후 첫 체크에서는 발송)
+  if (currentMinutes < targetMinutes) {
+    return;
+  }
+
+  settings.notifications.advanceDays.forEach(daysAhead => {
+    const targetDate = addDaysDateStr(today, daysAhead);
+    const todosOnDate = getTodosStartingOnDate(targetDate);
+
+    if (todosOnDate.length === 0) return;
+
+    // 테스트/운영 모두 안정적으로 동작하도록 "오늘 + 설정시간 + 대상일" 기준으로 중복 방지
+    const notifiedKey = `notified-${today}-${alertTime}-${targetDate}-${daysAhead}`;
+    if (localStorage.getItem(notifiedKey)) return;
+
+    // 알림 전송
+    const message = daysAhead === 0
+      ? `오늘 시작하는 일정 ${todosOnDate.length}개`
+      : `${daysAhead}일 후 시작하는 일정 ${todosOnDate.length}개`;
+
+    sendWebNotification("ReBorn 일정 알림", message);
+
+    localStorage.setItem(notifiedKey, String(Date.now()));
+  });
+}
+
+// ——— 자동 정리 ———
+function autoCleanupTodos() {
+  if (!settings.autoCleanup.completedAfterDays && !settings.autoCleanup.trashedAfterDays) {
+    return;
+  }
+
+  const today = new Date();
+  let changed = false;
+
+  // 완료 항목 자동 휴지통 이동
+  if (settings.autoCleanup.completedAfterDays) {
+    const threshold = new Date(today);
+    threshold.setDate(threshold.getDate() - settings.autoCleanup.completedAfterDays);
+
+    const toDelete = [];
+    todos.forEach(todo => {
+      if (todo.completed && todo.completedAt) {
+        const completedDate = new Date(todo.completedAt);
+        if (completedDate < threshold) {
+          toDelete.push(todo);
+        }
+      }
+    });
+
+    toDelete.forEach(todo => {
+      todo.deletedAt = new Date().toISOString();
+      deletedTodos.push(todo);
+      todos = todos.filter(t => t.id !== todo.id);
+      changed = true;
+    });
+
+    if (toDelete.length > 0) {
+      saveTodos();
+      saveTrash();
+    }
+  }
+
+  // 휴지통 항목 영구 삭제
+  if (settings.autoCleanup.trashedAfterDays) {
+    const threshold = new Date(today);
+    threshold.setDate(threshold.getDate() - settings.autoCleanup.trashedAfterDays);
+
+    const beforeCount = deletedTodos.length;
+    deletedTodos = deletedTodos.filter(todo => {
+      if (!todo.deletedAt) return true;
+      const deletedDate = new Date(todo.deletedAt);
+      return deletedDate >= threshold;
+    });
+
+    if (deletedTodos.length !== beforeCount) {
+      saveTrash();
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    renderList();
+  }
+}
+
 // ——— 초기화 ———
+loadSettings();
+initializeSettingsPickerSelects();
+initializeSettingsCustomPickers();
+initializeSettingsAccordions();
 loadTodos();
+restoreTimeTrackingState(); // 시간 트래킹 상태 복구
 loadTrash();
+initializeTimerSelects();
 if (sortSelect) sortSelect.value = currentSort;
 updatePrioritizeButton();
 renderList();
 if (headerQuoteEl) headerQuoteEl.textContent = pickRandomQuote();
 renderLucideIcons();
 if (input) input.focus();
+
+// ——— 시간 뷰 이벤트 리스너 ———
+stopwatchStartBtn?.addEventListener("click", startStopwatch);
+stopwatchResetBtn?.addEventListener("click", resetStopwatch);
+timerStartBtn?.addEventListener("click", startTimer);
+timerResetBtn?.addEventListener("click", resetTimer);
+timeTrackingMoreBtn?.addEventListener("click", () => {
+  timeTrackingExpanded = !timeTrackingExpanded;
+  renderTimeTracking();
+});
+
+// ——— 설정 뷰 이벤트 리스너 ———
+fontSizeSelect?.addEventListener("change", onFontSizeChange);
+weekStartSelect?.addEventListener("change", onWeekStartChange);
+notificationsToggle?.addEventListener("change", onNotificationsToggle);
+dailyAlertPeriodSelect?.addEventListener("change", onDailyAlertTimeChange);
+dailyAlertHourSelect?.addEventListener("change", onDailyAlertTimeChange);
+dailyAlertMinuteSelect?.addEventListener("change", onDailyAlertTimeChange);
+$$(".advance-days-cb").forEach(cb => {
+  cb.addEventListener("change", onNotificationTimingChange);
+});
+autoCleanupCompletedInput?.addEventListener("change", onAutoCleanupCompletedChange);
+autoCleanupTrashedInput?.addEventListener("change", onAutoCleanupTrashedChange);
+resetAllDataBtn?.addEventListener("click", resetAllData);
+
+// ——— 알림 및 자동화 시작 ———
+scheduleNotifications();
+autoCleanupTodos();
+
+// 매일 한 번씩 자동 정리 (24시간마다)
+setInterval(autoCleanupTodos, 24 * 60 * 60 * 1000);
+
+// 페이지 이탈 시 인터벌 정리
+window.addEventListener("beforeunload", () => {
+  stopAllTimeTracking();
+  Object.values(timeTrackingIntervals).forEach(intervalId => {
+    clearInterval(intervalId);
+  });
+});
